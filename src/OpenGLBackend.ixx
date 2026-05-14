@@ -24,7 +24,7 @@ import helios.spatial.components;
 
 import helios.core.components;
 
-import helios.platform.opengl;
+import helios.opengl.components;
 
 import helios.rendering.mesh;
 import helios.rendering.shader;
@@ -41,7 +41,7 @@ using namespace helios::core::components;
 using namespace helios::math;
 using namespace helios::rendering;
 using namespace helios::rendering::shader::types;
-using namespace helios::platform::opengl::components;
+using namespace helios::opengl::components;
 using namespace helios::spatial::components;
 using namespace helios::rendering::material::types;
 using namespace helios::rendering::common::types;

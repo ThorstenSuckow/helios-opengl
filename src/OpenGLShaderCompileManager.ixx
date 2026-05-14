@@ -27,7 +27,7 @@ import helios.rendering.shader.ShaderEntity;
 import helios.rendering.shader.types;
 import helios.rendering.shader.concepts;
 import helios.rendering.shader.commands;
-import helios.platform.opengl.components.OpenGLShaderComponent;
+import helios.opengl.components.OpenGLShaderComponent;
 
 import helios.runtime.world.EngineWorld;
 import helios.runtime.messaging.command.concepts;
@@ -45,7 +45,7 @@ using namespace helios::rendering::shader;
 using namespace helios::rendering::shader::types;
 using namespace helios::rendering::shader::concepts;
 using namespace helios::rendering::shader::commands;
-using namespace helios::platform::opengl::components;
+using namespace helios::opengl::components;
 using namespace helios::runtime::messaging::command::concepts;
 using namespace helios::runtime::messaging::command;
 #define HELIOS_LOG_SCOPE "helios::opengl::OpenGLShaderCompileManager"
