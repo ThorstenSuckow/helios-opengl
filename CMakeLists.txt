@@ -58,10 +58,12 @@ endif()
 target_link_libraries(
         helios_opengl
         PUBLIC
-        helios
-        thirdparty::freetype
-        thirdparty::opengl
-        thirdparty::imgui
+        $<BUILD_INTERFACE:helios>
+        $<INSTALL_INTERFACE:helios::helios>
+        PRIVATE
+        $<BUILD_INTERFACE:thirdparty::freetype>
+        $<BUILD_INTERFACE:thirdparty::opengl>
+        $<BUILD_INTERFACE:thirdparty::imgui>
 )
 
 set_property(TARGET helios_opengl PROPERTY CXX_SCAN_FOR_MODULES ON)
@@ -79,4 +81,49 @@ endif()
 
 target_include_directories(helios_opengl PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include>
 )
+
+set(HELIOS_OPENGL_ENABLE_PACKAGE_DEFAULT OFF)
+if(PROJECT_IS_TOP_LEVEL)
+    set(HELIOS_OPENGL_ENABLE_PACKAGE_DEFAULT ON)
+endif()
+option(HELIOS_OPENGL_ENABLE_PACKAGE "Enable install/export package files" ${HELIOS_OPENGL_ENABLE_PACKAGE_DEFAULT})
+if(HELIOS_OPENGL_ENABLE_PACKAGE)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+
+    install(TARGETS helios_opengl
+            EXPORT helios-openglTargets
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            FILE_SET modules DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+
+    set(HELIOS_OPENGL_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/helios-opengl")
+
+    configure_package_config_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/helios-openglConfig.cmake.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/helios-openglConfig.cmake"
+            INSTALL_DESTINATION "${HELIOS_OPENGL_INSTALL_CMAKEDIR}"
+    )
+
+    write_basic_package_version_file(
+            "${CMAKE_CURRENT_BINARY_DIR}/helios-openglConfigVersion.cmake"
+            VERSION "0.1.0"
+            COMPATIBILITY SameMajorVersion
+    )
+
+    install(EXPORT helios-openglTargets
+            FILE helios-openglTargets.cmake
+            NAMESPACE helios::
+            DESTINATION "${HELIOS_OPENGL_INSTALL_CMAKEDIR}"
+    )
+
+    install(FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/helios-openglConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/helios-openglConfigVersion.cmake"
+            DESTINATION "${HELIOS_OPENGL_INSTALL_CMAKEDIR}"
+    )
+endif()
