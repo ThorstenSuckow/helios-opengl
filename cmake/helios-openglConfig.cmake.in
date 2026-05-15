@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(helios-engine CONFIG)
+find_dependency(helios-math CONFIG)
+
+include("${CMAKE_CURRENT_LIST_DIR}/helios-openglTargets.cmake")
+
+check_required_components(helios-opengl)
+
