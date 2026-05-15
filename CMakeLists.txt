@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.0)
-project(helios-opengl LANGUAGES CXX)
+project(helios-opengl LANGUAGES C CXX)
 
 include(FetchContent)
 
@@ -28,6 +28,17 @@ if(NOT TARGET helios)
         )
         FetchContent_MakeAvailable(helios_engine)
     endif()
+endif()
+
+if(NOT TARGET thirdparty::glad)
+    FetchContent_Declare(glad
+            GIT_REPOSITORY https://github.com/Dav1dde/glad.git
+            GIT_TAG v2.0.8
+            SOURCE_SUBDIR cmake
+    )
+    FetchContent_MakeAvailable(glad)
+    glad_add_library(glad_gl_core_46 STATIC REPRODUCIBLE LOADER API gl:core=4.6)
+    add_library(thirdparty::glad ALIAS glad_gl_core_46)
 endif()
 
 if(CMAKE_IFC_OUTPUT_DIRECTORY)
@@ -62,6 +73,7 @@ target_link_libraries(
         $<INSTALL_INTERFACE:helios::helios>
         PRIVATE
         $<BUILD_INTERFACE:thirdparty::freetype>
+        $<BUILD_INTERFACE:thirdparty::glad>
         $<BUILD_INTERFACE:thirdparty::opengl>
         $<BUILD_INTERFACE:thirdparty::imgui>
 )
