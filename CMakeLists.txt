@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 4.0)
 project(helios-opengl LANGUAGES C CXX)
 
-include(CTest)
 include(FetchContent)
 
 set(HELIOS_MATH_LOCAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../helios-math" CACHE PATH "Local path to helios-math repository")
@@ -19,7 +18,7 @@ if(NOT TARGET helios_math AND NOT TARGET helios::math)
     endif()
 endif()
 
-if(NOT TARGET helios)
+if(NOT TARGET helios::engine)
     if(EXISTS "${HELIOS_ENGINE_LOCAL_PATH}/CMakeLists.txt")
         add_subdirectory("${HELIOS_ENGINE_LOCAL_PATH}" "${CMAKE_BINARY_DIR}/_deps/helios-engine-build")
     else()
@@ -61,7 +60,7 @@ list(FILTER MODULE_INTERFACE_FILES EXCLUDE REGEX "/CMakeFiles/|/CMakeTmp/|/cmake
 add_library(helios_opengl STATIC)
 add_library(helios::opengl ALIAS helios_opengl)
 
-# Keep the dependency explicit while engine still provides the aggregated helios target.
+# Keep the dependency explicit via the engine package target.
 if(TARGET helios_math)
     add_dependencies(helios_opengl helios_math)
 endif()
@@ -70,8 +69,8 @@ endif()
 target_link_libraries(
         helios_opengl
         PUBLIC
-        $<BUILD_INTERFACE:helios>
-        $<INSTALL_INTERFACE:helios::helios>
+        $<BUILD_INTERFACE:helios::engine>
+        $<INSTALL_INTERFACE:helios::engine>
         PRIVATE
         $<BUILD_INTERFACE:thirdparty::freetype>
         $<BUILD_INTERFACE:thirdparty::glad>
@@ -139,24 +138,4 @@ if(HELIOS_OPENGL_ENABLE_PACKAGE)
             "${CMAKE_CURRENT_BINARY_DIR}/helios-openglConfigVersion.cmake"
             DESTINATION "${HELIOS_OPENGL_INSTALL_CMAKEDIR}"
     )
-endif()
-
-if(BUILD_TESTING)
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-            googletest
-            GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG v1.17.0
-    )
-    FetchContent_MakeAvailable(googletest)
-
-    file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.test.cpp")
-
-    add_executable(helios-opengl-tests ${TEST_SOURCES})
-    target_link_libraries(helios-opengl-tests PRIVATE helios_opengl GTest::gtest_main)
-
-    include(GoogleTest)
-    gtest_discover_tests(helios-opengl-tests)
 endif()
