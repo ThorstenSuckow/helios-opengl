@@ -1,6 +1,6 @@
 /**
  * @file _module.ixx
- * @brief Module aggregator for `helios.platform.opengl.components`.
+ * @brief Module aggregator for `helios.engine.platform.opengl.components`.
  */
 export module helios.opengl.components;
 

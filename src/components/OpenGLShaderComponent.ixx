@@ -6,9 +6,9 @@ module;
 
 export module helios.opengl.components.OpenGLShaderComponent;
 
-import helios.rendering.shader.concepts.IsShaderHandle;
+import helios.engine.rendering.shader.concepts.IsShaderHandle;
 
-using namespace helios::rendering::shader::concepts;
+using namespace helios::engine::rendering::shader::concepts;
 export namespace helios::opengl::components {
 
     /**

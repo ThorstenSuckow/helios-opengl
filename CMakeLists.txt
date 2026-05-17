@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 4.0)
 project(helios-opengl LANGUAGES C CXX)
 
+include(CTest)
 include(FetchContent)
 
 set(HELIOS_MATH_LOCAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../helios-math" CACHE PATH "Local path to helios-math repository")
@@ -138,4 +139,24 @@ if(HELIOS_OPENGL_ENABLE_PACKAGE)
             "${CMAKE_CURRENT_BINARY_DIR}/helios-openglConfigVersion.cmake"
             DESTINATION "${HELIOS_OPENGL_INSTALL_CMAKEDIR}"
     )
+endif()
+
+if(BUILD_TESTING)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG v1.17.0
+    )
+    FetchContent_MakeAvailable(googletest)
+
+    file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.test.cpp")
+
+    add_executable(helios-opengl-tests ${TEST_SOURCES})
+    target_link_libraries(helios-opengl-tests PRIVATE helios_opengl GTest::gtest_main)
+
+    include(GoogleTest)
+    gtest_discover_tests(helios-opengl-tests)
 endif()

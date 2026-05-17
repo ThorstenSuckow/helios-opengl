@@ -8,9 +8,9 @@ module;
 
 export module helios.opengl.components.OpenGLFramebufferIdComponent;
 
-import helios.core.components.NumericValueComponent;
+import helios.engine.core.components.NumericValueComponent;
 
-using namespace helios::core::components;
+using namespace helios::engine::core::components;
 export namespace helios::opengl::components {
 
     /** @brief Domain tag for OpenGL framebuffer object identifiers. */

@@ -15,43 +15,43 @@ export module helios.opengl.OpenGLBackend;
 
 import helios.math.types;
 
-import helios.util.log;
+import helios.engine.util.log;
 
-import helios.rendering.common.types;
-import helios.rendering.common.components;
+import helios.engine.rendering.common.types;
+import helios.engine.rendering.common.components;
 
-import helios.spatial.components;
+import helios.engine.spatial.components;
 
-import helios.core.components;
+import helios.engine.core.components;
 
 import helios.opengl.components;
 
-import helios.rendering.mesh;
-import helios.rendering.shader;
-import helios.rendering.material;
-import helios.rendering.framebuffer;
-import helios.rendering.viewport;
-import helios.util.Colors;
+import helios.engine.rendering.mesh;
+import helios.engine.rendering.shader;
+import helios.engine.rendering.material;
+import helios.engine.rendering.framebuffer;
+import helios.engine.rendering.viewport;
+import helios.engine.util.Colors;
 
-import helios.scene.types.SceneMemberRenderContext;
+import helios.engine.scene.types.SceneMemberRenderContext;
 
-import helios.runtime.world.EngineWorld;
+import helios.engine.runtime.world.EngineWorld;
 
-using namespace helios::core::components;
+using namespace helios::engine::core::components;
 using namespace helios::math;
-using namespace helios::rendering;
-using namespace helios::rendering::shader::types;
+using namespace helios::engine::rendering;
+using namespace helios::engine::rendering::shader::types;
 using namespace helios::opengl::components;
-using namespace helios::spatial::components;
-using namespace helios::rendering::material::types;
-using namespace helios::rendering::common::types;
-using namespace helios::rendering::common::components;
-using namespace helios::rendering::mesh::types;
-using namespace helios::rendering::framebuffer::types;
-using namespace helios::rendering::viewport::types;
-using namespace helios::scene::types;
-using namespace helios::runtime::world;
-using namespace helios::util::log;
+using namespace helios::engine::spatial::components;
+using namespace helios::engine::rendering::material::types;
+using namespace helios::engine::rendering::common::types;
+using namespace helios::engine::rendering::common::components;
+using namespace helios::engine::rendering::mesh::types;
+using namespace helios::engine::rendering::framebuffer::types;
+using namespace helios::engine::rendering::viewport::types;
+using namespace helios::engine::scene::types;
+using namespace helios::engine::runtime::world;
+using namespace helios::engine::util::log;
 
 #define HELIOS_LOG_SCOPE "helios::opengl"
 export namespace helios::opengl {
@@ -68,7 +68,7 @@ export namespace helios::opengl {
 
         RenderTargetWorld& renderTargetsWorld_;
 
-        inline static const helios::util::log::Logger& logger_ = helios::util::log::LogManager::loggerForScope(
+        inline static const helios::engine::util::log::Logger& logger_ = helios::engine::util::log::LogManager::loggerForScope(
             HELIOS_LOG_SCOPE
         );
 

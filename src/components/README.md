@@ -1,4 +1,4 @@
-# helios::platform::opengl::components
+# helios::engine::platform::opengl::components
 
 OpenGL bridge components.
 
@@ -11,7 +11,7 @@ OpenGL bridge components.
 ---
 <details>
 <summary>Doxygen</summary><p>
-@namespace helios::platform::opengl::components
+@namespace helios::engine::platform::opengl::components
 @brief OpenGL bridge components.
 </p></details>
 
