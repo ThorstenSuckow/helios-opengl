@@ -84,7 +84,7 @@ export namespace helios::opengl {
 
             using Handle = typename MeshEntity::Handle_type;
 
-            logger_.info("Uploading mesh data...");
+            logger_.info("Uploading mesh data for MeshEntity {0}...", mesh.handle().entityId);
 
             if (!mesh.template get<MeshUploadRequestComponent<Handle>>()) {
                 logger_.error("MeshUpload not requested by this entity");
