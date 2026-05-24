@@ -104,6 +104,9 @@ export namespace helios::opengl {
 
             auto& openglMesh = mesh.template add<OpenGLMeshComponent<Handle>>();
 
+            openglMesh.indexCount    = meshData.indices.size();
+            openglMesh.primitiveType = meshData.primitiveType;
+
             glGenVertexArrays(1, &openglMesh.vao);
             glGenBuffers(1, &openglMesh.vbo);
             glGenBuffers(1, &openglMesh.ebo);
