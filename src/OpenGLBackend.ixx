@@ -1,6 +1,6 @@
 /**
  * @file OpenGLBackend.ixx
- * @brief Draft OpenGL backend for render pass execution.
+ * @brief OpenGL backend for render-pass execution and indexed draw submission.
  */
 module;
 
@@ -9,6 +9,7 @@ module;
 #include <memory>
 #include <cassert>
 #include <utility>
+#include <type_traits>
 #include "helios-opengl-config.h"
 
 
@@ -26,6 +27,8 @@ import helios.engine.spatial.components;
 import helios.engine.core.components;
 
 import helios.opengl.components;
+import helios.opengl.OpenGLEnumMapper;
+
 
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
@@ -41,7 +44,9 @@ import helios.engine.runtime.world.EngineWorld;;
 using namespace helios::engine::core::components;
 using namespace helios::math;
 using namespace helios::engine::rendering;
+using namespace helios::engine::rendering::mesh::components;
 using namespace helios::engine::rendering::shader::types;
+using namespace helios::opengl;
 using namespace helios::opengl::components;
 using namespace helios::engine::spatial::components;
 using namespace helios::engine::rendering::material::types;
@@ -59,7 +64,7 @@ export namespace helios::opengl {
 
 
     /**
-     * @brief Applies render-pass state and draw execution via OpenGL.
+     * @brief Applies render-pass state and executes OpenGL draw calls.
      *
      * @details
      * `OpenGLBackend` is intentionally thin and stateful: it references existing
@@ -174,35 +179,86 @@ export namespace helios::opengl {
         /**
          * @brief Renders one extracted scene member.
          *
+         * @details
+         * Resolves shader and mesh entities from render-resource handles, validates
+         * expected OpenGL components in debug/error paths, binds program and VAO,
+         * and submits one indexed `glDrawElements` call.
+         *
          * @tparam THandle Scene member handle type.
          * @param renderContext Per-member render context.
-         *
-         * @note Placeholder hook for concrete draw submission.
          */
         template<typename THandle>
         void doRender(const SceneMemberRenderContext<THandle>& renderContext)  {
 
+            auto meshHandle = renderContext.meshHandle;
+            auto shaderHandle = renderContext.shaderHandle;
+
+            // shader
+            auto shaderEntity = renderResourcesWorld_.findEntity(shaderHandle);
+            if (!shaderEntity) {
+                logger_.error("ShaderEntity expected, but not found");
+                assert(false && "ShaderEntity not found");
+                return;
+            }
+            using ShaderHandle_t = std::remove_cvref_t<decltype(shaderHandle)>;
+
+            auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle_t>>();
+            if (!openglShader) {
+                logger_.error("OpenGLShader expected, but not found");
+                assert(false && "OpenGLShader not found");
+                return;
+            }
+
+            // opengl mesh
+            auto meshEntity = renderResourcesWorld_.findEntity(meshHandle);
+            if (!meshEntity) {
+                logger_.error("MeshEntity expected, but not found");
+                assert(false && "MeshEntity not found");
+                return;
+            }
+            using MeshHandle_t = std::remove_cvref_t<decltype(meshHandle)>;
+
+            auto* openglMesh = meshEntity->template get<OpenGLMeshComponent<MeshHandle_t>>();
+            if (!openglMesh) {
+                logger_.error("OpenGLMesh expected, but not found");
+                assert(false && "OpenGLMesh not found");
+                return;
+            }
+
+            unsigned int vao = openglMesh->vao;
+
+            glUseProgram(openglShader->programId);
+
+            glBindVertexArray(vao);
+
+            glDrawElements(OpenGLEnumMapper::toOpenGL(openglMesh->primitiveType),
+                openglMesh->indexCount,
+                GL_UNSIGNED_INT,
+                nullptr
+            );
         }
 
         /**
          * @brief Ends the current render pass.
          *
          * @details
-         * Restores transient state that was enabled in `beginRenderPass`.
+         * Restores transient OpenGL state enabled in `beginRenderPass`.
          *
          * @param renderPassContext Render pass target context.
          */
         void endRenderPass(const RenderPassContext& renderPassContext) {
 
             glDisable(GL_SCISSOR_TEST);
+            glBindVertexArray(0);
 
         }
 
         /**
-         * @brief Applies window hints for an OpenGL core profile context.
+         * @brief Applies window hints for an OpenGL core-profile context.
          *
          * @details
-         * The backend currently requests OpenGL 4.1 core profile for MacOS compatibility.
+         * The backend currently requests OpenGL 4.1 core profile for macOS
+         * compatibility.
          */
         void provideWindowHints() noexcept {
 
@@ -213,12 +269,11 @@ export namespace helios::opengl {
         }
 
         /**
-         * @brief Initializes GL function pointers through GLFW.
-         *
-         * @return `true` if loading succeeded, otherwise `false`.
+         * @brief Initializes OpenGL function pointers through GLFW.
          *
          * @pre A valid, current OpenGL context exists on the calling thread.
          * @post `isInitialized()` returns `true` on success.
+         * @return `true` if loading succeeded, otherwise `false`.
          */
         bool init() {
 
@@ -241,7 +296,7 @@ export namespace helios::opengl {
         }
 
         /**
-         * @brief Reports whether GL function loading was completed.
+         * @brief Reports whether OpenGL function loading completed successfully.
          */
         bool isInitialized() {
             return isInitialized_;
