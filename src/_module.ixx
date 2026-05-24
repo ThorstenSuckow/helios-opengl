@@ -9,3 +9,4 @@ export import helios.opengl.components;
 
 export import helios.opengl.OpenGLBackend;
 export import helios.opengl.OpenGLShaderCompileManager;
+export import helios.opengl.OpenGLMeshUploadManager;
