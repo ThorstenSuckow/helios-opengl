@@ -27,6 +27,8 @@ import helios.engine.rendering.shader.ShaderEntity;
 import helios.engine.rendering.shader.types;
 import helios.engine.rendering.shader.concepts;
 import helios.engine.rendering.shader.commands;
+import helios.engine.rendering.shader.NullUniformCacheStrategy;
+
 import helios.opengl.components.OpenGLShaderComponent;
 
 import helios.engine.runtime.world.EngineWorld;
@@ -57,8 +59,8 @@ export namespace helios::opengl {
      * @tparam THandle Shader handle type.
      * @tparam TCommandBuffer Command buffer type for optional follow-up commands.
      */
-    template<typename THandle, typename TCommandBuffer = NullCommandBuffer>
-    requires IsShaderHandle<THandle> && IsCommandBufferLike<TCommandBuffer>
+    template<typename THandle, typename TUniformCacheStrategy = NullUniformCacheStrategy<THandle>>
+    requires IsShaderHandle<THandle> && IsUniformCacheStrategyLike<TUniformCacheStrategy, THandle>
     class OpenGLShaderCompileManager {
 
         BasicStringFileReader stringFileReader_;
@@ -73,6 +75,8 @@ export namespace helios::opengl {
 
 
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
+
+        TUniformCacheStrategy uniformCacheStrategy_;
 
         /**
          * @brief Loads the specified vertex and fragment shader.
@@ -193,9 +197,13 @@ export namespace helios::opengl {
          *
          * @param renderResourceWorld Render-resource world used to resolve shader entities.
          */
-        explicit OpenGLShaderCompileManager(RenderResourceWorld& renderResourceWorld)
+        explicit OpenGLShaderCompileManager(
+            RenderResourceWorld& renderResourceWorld,
+            TUniformCacheStrategy&& uniformCacheStrategy
+        )
         : 
-        renderResourceWorld_(renderResourceWorld)
+        renderResourceWorld_(renderResourceWorld),
+        uniformCacheStrategy_(std::move(uniformCacheStrategy))
         { }
 
         /**
@@ -228,6 +236,7 @@ export namespace helios::opengl {
                     logger_.error("Could not compile shader");
                 } else {
                     shaderEntity->template remove<ShaderSourceComponent<THandle>>();
+                    uniformCacheStrategy_.cacheUniforms(shaderEntity->handle(), renderResourceWorld_, updateContext);
                 }
             }
 
