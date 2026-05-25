@@ -27,7 +27,6 @@ import helios.engine.spatial.components;
 import helios.engine.core.components;
 
 import helios.opengl.components;
-import helios.opengl.OpenGLEnumMapper;
 
 
 import helios.engine.rendering.mesh;
@@ -231,7 +230,8 @@ export namespace helios::opengl {
 
             glBindVertexArray(vao);
 
-            glDrawElements(OpenGLEnumMapper::toOpenGL(openglMesh->primitiveType),
+            glDrawElements(
+                openglMesh->primitiveType,
                 openglMesh->indexCount,
                 GL_UNSIGNED_INT,
                 nullptr

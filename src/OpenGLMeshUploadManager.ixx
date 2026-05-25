@@ -37,6 +37,7 @@ import helios.engine.runtime.world;
 
 
 import helios.opengl.components.OpenGLMeshComponent;
+import helios.opengl.OpenGLEnumMapper;
 
 using namespace helios::engine::runtime::world;
 using namespace helios::engine::util::log;
@@ -49,6 +50,7 @@ using namespace helios::engine::rendering::mesh::types;
 using namespace helios::engine::rendering::mesh::concepts;
 using namespace helios::engine::rendering::mesh::commands;
 using namespace helios::engine::rendering::common::types;
+using namespace helios::opengl;
 using namespace helios::opengl::components;
 using namespace helios::engine::runtime::messaging::command::concepts;
 using namespace helios::engine::runtime::messaging::command;
@@ -105,7 +107,7 @@ export namespace helios::opengl {
             auto& openglMesh = mesh.template add<OpenGLMeshComponent<Handle>>();
 
             openglMesh.indexCount    = meshData.indices.size();
-            openglMesh.primitiveType = meshData.primitiveType;
+            openglMesh.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
             glGenVertexArrays(1, &openglMesh.vao);
             glGenBuffers(1, &openglMesh.vbo);

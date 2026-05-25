@@ -4,6 +4,7 @@
  */
 module;
 
+#include <glad/gl.h>
 #include <cstddef>
 
 export module helios.opengl.components.OpenGLMeshComponent;
@@ -43,7 +44,7 @@ export namespace helios::opengl::components {
         /**
          * @brief Primitive topology used for rendering this mesh.
          */
-        PrimitiveType primitiveType;
+        GLenum primitiveType;
 
     };
 
