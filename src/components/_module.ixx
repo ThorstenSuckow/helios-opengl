@@ -7,3 +7,4 @@ export module helios.opengl.components;
 export import helios.opengl.components.OpenGLShaderComponent;
 export import helios.opengl.components.OpenGLMeshComponent;
 export import helios.opengl.components.OpenGLFramebufferIdComponent;
+export import helios.opengl.components.OpenGLUniformLocationComponent;
