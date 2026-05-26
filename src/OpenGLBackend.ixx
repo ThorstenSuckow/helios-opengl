@@ -15,7 +15,9 @@ module;
 
 export module helios.opengl.OpenGLBackend;
 
-import helios.math.types;
+import helios.ecs.types;
+
+import helios.math;
 
 import helios.engine.util.log;
 
@@ -41,9 +43,9 @@ import helios.engine.scene.types.SceneMemberRenderContext;
 import helios.engine.runtime.world.EngineWorld;;
 
 using namespace helios::engine::core::components;
-using namespace helios::math;
 using namespace helios::engine::rendering;
 using namespace helios::engine::rendering::mesh::components;
+using namespace helios::engine::rendering::shader;
 using namespace helios::engine::rendering::shader::types;
 using namespace helios::opengl;
 using namespace helios::opengl::components;
@@ -57,6 +59,7 @@ using namespace helios::engine::rendering::viewport::types;
 using namespace helios::engine::scene::types;
 using namespace helios::engine::runtime::world;
 using namespace helios::engine::util::log;
+using namespace helios::ecs::types;
 
 #define HELIOS_LOG_SCOPE "helios::opengl"
 export namespace helios::opengl {
@@ -70,18 +73,46 @@ export namespace helios::opengl {
      * worlds and translates ECS render data into OpenGL state changes.
      */
     class OpenGLBackend {
-
     private:
 
+        /**
+         * @brief Cached uniform values grouped by uniform update scope.
+         * @tparam TUniformScope Scope tag that separates pass- and draw-level data.
+         */
+        template<typename TUniformScope>
+        struct UniformValueBag {
+            /** @brief Model/world matrix used for per-draw updates. */
+            helios::math::mat4f worldMatrix{};
+            /** @brief View matrix used for pass-level updates. */
+            helios::math::mat4f viewMatrix{};
+            /** @brief Projection matrix used for pass-level updates. */
+            helios::math::mat4f projectionMatrix{};
+            /** @brief Optional color payload for future semantic mappings. */
+            helios::math::vec4f color{};
+        };
+
+        /** @brief Render-resource ECS world (meshes, shaders, materials). */
         RenderResourceWorld& renderResourcesWorld_;
 
+        /** @brief Render-target ECS world (framebuffers, viewports). */
         RenderTargetWorld& renderTargetsWorld_;
 
+        /** @brief Tracks whether GL function pointers were initialized. */
         bool isInitialized_ = false;
 
         inline static const helios::engine::util::log::Logger& logger_ = helios::engine::util::log::LogManager::loggerForScope(
             HELIOS_LOG_SCOPE
         );
+
+        /** @brief Currently active viewport for pass consistency checks. */
+        ViewportHandle currentViewportHandle_{};
+        /** @brief Currently bound shader to avoid redundant `glUseProgram` calls. */
+        ShaderHandle currentShaderHandle_{};
+
+        /** @brief Cached pass-scope uniform values (view/projection). */
+        UniformValueBag<UniformScope::Pass> passUniformValueBag_{};
+        /** @brief Cached draw-scope uniform values (model/world and per-draw data). */
+        UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
 
     public:
 
@@ -114,6 +145,11 @@ export namespace helios::opengl {
         void beginRenderPass(const RenderPassContext& renderPassContext) {
 
             auto viewportHandle = renderPassContext.viewportHandle;
+
+            currentViewportHandle_ = viewportHandle;
+            passUniformValueBag_.projectionMatrix = renderPassContext.projectionMatrix;
+            passUniformValueBag_.viewMatrix       = renderPassContext.viewMatrix;
+
             auto framebufferHandle = renderPassContext.framebufferHandle;
 
             auto viewport = renderTargetsWorld_.findEntity<ViewportHandle>(viewportHandle);
@@ -189,6 +225,8 @@ export namespace helios::opengl {
         template<typename THandle>
         void doRender(const SceneMemberRenderContext<THandle>& renderContext)  {
 
+            assert(renderContext.viewportHandle == currentViewportHandle_ && "ViewportHandle out of sync");
+
             auto meshHandle = renderContext.meshHandle;
             auto shaderHandle = renderContext.shaderHandle;
 
@@ -201,7 +239,7 @@ export namespace helios::opengl {
             }
             using ShaderHandle_t = std::remove_cvref_t<decltype(shaderHandle)>;
 
-            auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle_t>>();
+            auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle>>();
             if (!openglShader) {
                 logger_.error("OpenGLShader expected, but not found");
                 assert(false && "OpenGLShader not found");
@@ -224,11 +262,22 @@ export namespace helios::opengl {
                 return;
             }
 
+            if (currentShaderHandle_ != shaderHandle) {
+                glUseProgram(openglShader->programId);
+
+                updateUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueBag_);
+                currentShaderHandle_ = shaderHandle;
+            }
+
             unsigned int vao = openglMesh->vao;
-
-            glUseProgram(openglShader->programId);
-
             glBindVertexArray(vao);
+
+            drawUniformValueBag_.worldMatrix = renderContext.worldMatrix;
+            updateUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
+
+            if (passUniformValueBag_.viewMatrix(0, 0) != 1.0f) {
+                logger_.debug("YO!");
+            }
 
             glDrawElements(
                 openglMesh->primitiveType,
@@ -236,6 +285,51 @@ export namespace helios::opengl {
                 GL_UNSIGNED_INT,
                 nullptr
             );
+
+        }
+
+        /**
+         * @brief Uploads cached uniform values for a specific uniform scope.
+         *
+         * @details Resolves `OpenGLUniformLocationComponent<ShaderHandle, TUniformScope>`
+         * on the shader entity and writes matching values from `uniformValueBag`
+         * to all cached OpenGL uniform locations. Locations with `-1` are skipped.
+         *
+         * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
+         * @param shaderEntity Shader entity holding location cache and shader data.
+         * @param uniformValueBag Source values to upload for this scope.
+         */
+        template<typename TUniformScope>
+        void updateUniformValues(ShaderEntity shaderEntity, UniformValueBag<TUniformScope>& uniformValueBag) {
+
+            auto* ulc = shaderEntity.get<OpenGLUniformLocationComponent<ShaderHandle, TUniformScope>>();
+
+            if (!ulc) {
+                logger_.warn("No OpenGLUniformLocationComponent for scope {0}, skipping uniform updates.", typeid(TUniformScope).name());
+            } else {
+
+                for (std::size_t i = 0; i < ulc->locations.size(); ++i) {
+                    GLint location = ulc->locations[i];
+                    if (location == -1) {
+                        continue;
+                    }
+                    switch (static_cast<UniformSemantics>(i)) {
+                    case UniformSemantics::ViewMatrix:
+                        glUniformMatrix4fv(location, 1, GL_FALSE, helios::math::value_ptr(uniformValueBag.viewMatrix));
+                        break;
+                    case UniformSemantics::ProjectionMatrix:
+                        glUniformMatrix4fv(location, 1, GL_FALSE, helios::math::value_ptr(uniformValueBag.projectionMatrix));
+                        break;
+                    case UniformSemantics::ModelMatrix:
+                        glUniformMatrix4fv(location, 1, GL_FALSE, helios::math::value_ptr(uniformValueBag.worldMatrix));
+                        break;
+
+                    }
+                }
+
+            }
+
+
         }
 
         /**
@@ -251,6 +345,11 @@ export namespace helios::opengl {
             glDisable(GL_SCISSOR_TEST);
             glBindVertexArray(0);
 
+            // new ViewportHandle -> invalid
+            currentViewportHandle_ = ViewportHandle{};
+            currentShaderHandle_   = ShaderHandle{};
+            passUniformValueBag_   = UniformValueBag<UniformScope::Pass>{};
+            drawUniformValueBag_   = UniformValueBag<UniformScope::Draw>{};
         }
 
         /**
