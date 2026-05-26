@@ -60,7 +60,7 @@ export namespace helios::opengl {
      * @tparam TCommandBuffer Command buffer type for optional follow-up commands.
      */
     template<typename THandle, typename TUniformCacheStrategy = NullUniformCacheStrategy<THandle>>
-    requires IsShaderHandle<THandle> && IsUniformCacheStrategyLike<TUniformCacheStrategy, THandle>
+    requires IsShaderHandle<THandle> && IsUniformCacheStrategyLike<TUniformCacheStrategy, THandle, UniformScope::Pass, UniformScope::Draw>
     class OpenGLShaderCompileManager {
 
         BasicStringFileReader stringFileReader_;
@@ -236,7 +236,8 @@ export namespace helios::opengl {
                     logger_.error("Could not compile shader");
                 } else {
                     shaderEntity->template remove<ShaderSourceComponent<THandle>>();
-                    uniformCacheStrategy_.cacheUniforms(shaderEntity->handle(), renderResourceWorld_, updateContext);
+                    uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), renderResourceWorld_, updateContext);
+                    uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), renderResourceWorld_, updateContext);
                 }
             }
 
