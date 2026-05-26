@@ -52,6 +52,7 @@ export namespace helios::opengl {
          * writes results into `OpenGLUniformLocationComponent`, and removes the mapping
          * component after processing.
          */
+        template<typename TUniformScope>
         [[nodiscard]] bool cacheUniforms(
             THandle entityHandle,
             RenderResourceWorld& renderResourceWorld,
@@ -65,7 +66,7 @@ export namespace helios::opengl {
                 return false;
             }
 
-            auto* umc = shaderEntity->template get<UniformMappingsComponent<THandle>>();
+            auto* umc = shaderEntity->template get<UniformMappingsComponent<THandle, TUniformScope>>();
             if (!umc) {
                 logger_.info("No UniformMappingsComponent available.");
                 return false;
@@ -79,7 +80,7 @@ export namespace helios::opengl {
 
             GLuint programId = osc->programId;
 
-            auto& ulc = shaderEntity->template getOrAdd<OpenGLUniformLocationComponent<THandle>>();
+            auto& ulc = shaderEntity->template getOrAdd<OpenGLUniformLocationComponent<THandle, TUniformScope>>();
 
             for (std::size_t i = 0; i < umc->mappings.size(); ++i ) {
                 if (!umc->mappings[i].empty()) {
@@ -94,7 +95,7 @@ export namespace helios::opengl {
                 }
             }
 
-            shaderEntity->template remove<UniformMappingsComponent<THandle>>();
+            shaderEntity->template remove<UniformMappingsComponent<THandle, TUniformScope>>();
 
             return true;
         }
