@@ -29,6 +29,7 @@ import helios.engine.spatial.components;
 import helios.engine.core.components;
 
 import helios.opengl.components;
+import helios.opengl.OpenGLUniformLocationWriter;
 
 
 import helios.engine.rendering.mesh;
@@ -76,43 +77,62 @@ export namespace helios::opengl {
     private:
 
         /**
-         * @brief Cached uniform values grouped by uniform update scope.
-         * @tparam TUniformScope Scope tag that separates pass- and draw-level data.
+         * @brief Render-resource ECS world (meshes, shaders, materials).
          */
-        template<typename TUniformScope>
-        struct UniformValueBag {
-            /** @brief Model/world matrix used for per-draw updates. */
-            helios::math::mat4f worldMatrix{};
-            /** @brief View matrix used for pass-level updates. */
-            helios::math::mat4f viewMatrix{};
-            /** @brief Projection matrix used for pass-level updates. */
-            helios::math::mat4f projectionMatrix{};
-            /** @brief Optional color payload for future semantic mappings. */
-            helios::math::vec4f color{};
-        };
-
-        /** @brief Render-resource ECS world (meshes, shaders, materials). */
         RenderResourceWorld& renderResourcesWorld_;
 
-        /** @brief Render-target ECS world (framebuffers, viewports). */
+        /**
+         * @brief Render-target ECS world (framebuffers, viewports).
+         */
         RenderTargetWorld& renderTargetsWorld_;
 
-        /** @brief Tracks whether GL function pointers were initialized. */
+        /**
+         * @brief Tracks whether GL function pointers were initialized.
+         */
         bool isInitialized_ = false;
 
         inline static const helios::engine::util::log::Logger& logger_ = helios::engine::util::log::LogManager::loggerForScope(
             HELIOS_LOG_SCOPE
         );
 
-        /** @brief Currently active viewport for pass consistency checks. */
+        /**
+         * @brief Helper that writes cached uniform values to OpenGL locations.
+         */
+        OpenGLUniformLocationWriter uniformWriter_{};
+
+        /**
+         * @brief Currently active viewport for pass consistency checks.
+         */
         ViewportHandle currentViewportHandle_{};
-        /** @brief Currently bound shader to avoid redundant `glUseProgram` calls. */
+        /**
+         * @brief Currently bound shader to avoid redundant `glUseProgram` calls.
+         */
         ShaderHandle currentShaderHandle_{};
 
-        /** @brief Cached pass-scope uniform values (view/projection). */
-        UniformValueBag<UniformScope::Pass> passUniformValueBag_{};
-        /** @brief Cached draw-scope uniform values (model/world and per-draw data). */
-        UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
+        /**
+         * @brief Currently bound material to avoid redundant material updates.
+         */
+        MaterialHandle currentMaterialHandle_{};
+
+        /**
+         * @brief Currently bound mesh handle to avoid redundant VAO binds.
+         */
+        MeshHandle currentMeshHandle_{};
+
+        /**
+         * @brief Cached pointer to the currently bound OpenGL mesh component.
+         */
+        OpenGLMeshComponent<MeshHandle>* currentOpenGLMesh_ = nullptr;
+
+        /**
+         * @brief Cached pass-scope uniform values (view/projection).
+         */
+        UniformValueMap<UniformScope::Pass> passUniformValueMap_{};
+
+        /**
+         * @brief Cached draw-scope uniform values (model/world and per-draw data).
+         */
+        UniformValueMap<UniformScope::Draw> drawUniformValueMap_{};
 
     public:
 
@@ -147,8 +167,8 @@ export namespace helios::opengl {
             auto viewportHandle = renderPassContext.viewportHandle;
 
             currentViewportHandle_ = viewportHandle;
-            passUniformValueBag_.projectionMatrix = renderPassContext.projectionMatrix;
-            passUniformValueBag_.viewMatrix       = renderPassContext.viewMatrix;
+            passUniformValueMap_.set(UniformSemantics::ProjectionMatrix, renderPassContext.projectionMatrix);
+            passUniformValueMap_.set(UniformSemantics::ViewMatrix, renderPassContext.viewMatrix);
 
             auto framebufferHandle = renderPassContext.framebufferHandle;
 
@@ -229,59 +249,69 @@ export namespace helios::opengl {
 
             auto meshHandle = renderContext.meshHandle;
             auto shaderHandle = renderContext.shaderHandle;
+            auto materialHandle = renderContext.materialHandle;
 
-            // shader
             auto shaderEntity = renderResourcesWorld_.findEntity(shaderHandle);
             if (!shaderEntity) {
                 logger_.error("ShaderEntity expected, but not found");
                 assert(false && "ShaderEntity not found");
                 return;
             }
-            using ShaderHandle_t = std::remove_cvref_t<decltype(shaderHandle)>;
-
-            auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle>>();
-            if (!openglShader) {
-                logger_.error("OpenGLShader expected, but not found");
-                assert(false && "OpenGLShader not found");
-                return;
-            }
-
-            // opengl mesh
-            auto meshEntity = renderResourcesWorld_.findEntity(meshHandle);
-            if (!meshEntity) {
-                logger_.error("MeshEntity expected, but not found");
-                assert(false && "MeshEntity not found");
-                return;
-            }
-            using MeshHandle_t = std::remove_cvref_t<decltype(meshHandle)>;
-
-            auto* openglMesh = meshEntity->template get<OpenGLMeshComponent<MeshHandle_t>>();
-            if (!openglMesh) {
-                logger_.error("OpenGLMesh expected, but not found");
-                assert(false && "OpenGLMesh not found");
-                return;
-            }
 
             if (currentShaderHandle_ != shaderHandle) {
-                glUseProgram(openglShader->programId);
+                auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle>>();
+                if (!openglShader) {
+                    logger_.error("OpenGLShader expected, but not found");
+                    assert(false && "OpenGLShader not found");
+                    return;
+                }
 
-                updateUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueBag_);
+                glUseProgram(openglShader->programId);
+                writeUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueMap_);
                 currentShaderHandle_ = shaderHandle;
             }
 
-            unsigned int vao = openglMesh->vao;
-            glBindVertexArray(vao);
+            if (currentMaterialHandle_ != materialHandle) {
+                auto materialEntity = renderResourcesWorld_.findEntity(materialHandle);
+                if (!materialEntity) {
+                    logger_.error("MaterialEntity expected, but not found");
+                    assert(false && "MaterialEntity not found");
+                } else {
+                    auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
+                    if (colorComponent) {
+                        drawUniformValueMap_.set(UniformSemantics::MaterialBaseColor, colorComponent->value());
+                    }
 
-            drawUniformValueBag_.worldMatrix = renderContext.worldMatrix;
-            updateUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
-
-            if (passUniformValueBag_.viewMatrix(0, 0) != 1.0f) {
-                logger_.debug("YO!");
+                    currentMaterialHandle_ = materialHandle;
+                }
             }
 
+            if (currentMeshHandle_ != meshHandle) {
+                auto meshEntity = renderResourcesWorld_.findEntity(meshHandle);
+                if (!meshEntity) {
+                    logger_.error("MeshEntity expected, but not found");
+                    assert(false && "MeshEntity not found");
+                } else {
+                    auto* openglMesh = meshEntity->template get<OpenGLMeshComponent<MeshHandle>>();
+                    if (!openglMesh) {
+                        logger_.error("OpenGLMesh expected, but not found");
+                        assert(false && "OpenGLMesh not found");
+                        return;
+                    } else {
+                        currentOpenGLMesh_ = openglMesh;
+                        glBindVertexArray(openglMesh->vao);
+                        currentMeshHandle_  = meshHandle;
+                    }
+                }
+            }
+
+            drawUniformValueMap_.set(UniformSemantics::ModelMatrix, renderContext.worldMatrix);
+            writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueMap_);
+
+
             glDrawElements(
-                openglMesh->primitiveType,
-                openglMesh->indexCount,
+                currentOpenGLMesh_->primitiveType,
+                currentOpenGLMesh_->indexCount,
                 GL_UNSIGNED_INT,
                 nullptr
             );
@@ -292,44 +322,19 @@ export namespace helios::opengl {
          * @brief Uploads cached uniform values for a specific uniform scope.
          *
          * @details Resolves `OpenGLUniformLocationComponent<ShaderHandle, TUniformScope>`
-         * on the shader entity and writes matching values from `uniformValueBag`
+         * on the shader entity and writes matching values from `uniformValueMap`
          * to all cached OpenGL uniform locations. Locations with `-1` are skipped.
          *
          * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
          * @param shaderEntity Shader entity holding location cache and shader data.
-         * @param uniformValueBag Source values to upload for this scope.
+         * @param uniformValueMap Source values to upload for this scope.
          */
         template<typename TUniformScope>
-        void updateUniformValues(ShaderEntity shaderEntity, UniformValueBag<TUniformScope>& uniformValueBag) {
+        void writeUniformValues(ShaderEntity shaderEntity, UniformValueMap<TUniformScope>& uniformValueMap) {
 
             auto* ulc = shaderEntity.get<OpenGLUniformLocationComponent<ShaderHandle, TUniformScope>>();
 
-            if (!ulc) {
-                logger_.warn("No OpenGLUniformLocationComponent for scope {0}, skipping uniform updates.", typeid(TUniformScope).name());
-            } else {
-
-                for (std::size_t i = 0; i < ulc->locations.size(); ++i) {
-                    GLint location = ulc->locations[i];
-                    if (location == -1) {
-                        continue;
-                    }
-                    switch (static_cast<UniformSemantics>(i)) {
-                    case UniformSemantics::ViewMatrix:
-                        glUniformMatrix4fv(location, 1, GL_FALSE, helios::math::value_ptr(uniformValueBag.viewMatrix));
-                        break;
-                    case UniformSemantics::ProjectionMatrix:
-                        glUniformMatrix4fv(location, 1, GL_FALSE, helios::math::value_ptr(uniformValueBag.projectionMatrix));
-                        break;
-                    case UniformSemantics::ModelMatrix:
-                        glUniformMatrix4fv(location, 1, GL_FALSE, helios::math::value_ptr(uniformValueBag.worldMatrix));
-                        break;
-
-                    }
-                }
-
-            }
-
-
+            uniformWriter_.writeUniformValues(ulc, uniformValueMap);
         }
 
         /**
@@ -348,8 +353,11 @@ export namespace helios::opengl {
             // new ViewportHandle -> invalid
             currentViewportHandle_ = ViewportHandle{};
             currentShaderHandle_   = ShaderHandle{};
-            passUniformValueBag_   = UniformValueBag<UniformScope::Pass>{};
-            drawUniformValueBag_   = UniformValueBag<UniformScope::Draw>{};
+            currentMaterialHandle_ = MaterialHandle{};
+            currentMeshHandle_     = MeshHandle{};
+            currentOpenGLMesh_     = nullptr;
+            passUniformValueMap_.clear();
+            drawUniformValueMap_.clear();
         }
 
         /**
