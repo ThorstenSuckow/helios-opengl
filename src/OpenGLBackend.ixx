@@ -28,8 +28,9 @@ import helios.engine.spatial.components;
 
 import helios.engine.core.components;
 
+import helios.opengl.OpenGLUniformWriter;
 import helios.opengl.components;
-import helios.opengl.OpenGLUniformLocationWriter;
+import helios.opengl.types;
 
 
 import helios.engine.rendering.mesh;
@@ -41,7 +42,9 @@ import helios.engine.util.Colors;
 
 import helios.engine.scene.types.SceneMemberRenderContext;
 
-import helios.engine.runtime.world.EngineWorld;;
+import helios.engine.runtime.world.EngineWorld;
+
+import helios.opengl.types;
 
 using namespace helios::engine::core::components;
 using namespace helios::engine::rendering;
@@ -50,6 +53,7 @@ using namespace helios::engine::rendering::shader;
 using namespace helios::engine::rendering::shader::types;
 using namespace helios::opengl;
 using namespace helios::opengl::components;
+using namespace helios::opengl::types;
 using namespace helios::engine::spatial::components;
 using namespace helios::engine::rendering::material::types;
 using namespace helios::engine::rendering::common::types;
@@ -95,10 +99,6 @@ export namespace helios::opengl {
             HELIOS_LOG_SCOPE
         );
 
-        /**
-         * @brief Helper that writes cached uniform values to OpenGL locations.
-         */
-        OpenGLUniformLocationWriter uniformWriter_{};
 
         /**
          * @brief Currently active viewport for pass consistency checks.
@@ -123,16 +123,17 @@ export namespace helios::opengl {
          * @brief Cached pointer to the currently bound OpenGL mesh component.
          */
         OpenGLMeshComponent<MeshHandle>* currentOpenGLMesh_ = nullptr;
+        
+        /**
+         * @brief Cached pass-scope uniforms (typically view/projection).
+         */
+         UniformValueBag<UniformScope::Pass> passUniformValueBag_{};
 
         /**
-         * @brief Cached pass-scope uniform values (view/projection).
+         * @brief Cached draw-scope uniforms (for example model matrix/material color).
          */
-        UniformValueMap<UniformScope::Pass> passUniformValueMap_{};
+         UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
 
-        /**
-         * @brief Cached draw-scope uniform values (model/world and per-draw data).
-         */
-        UniformValueMap<UniformScope::Draw> drawUniformValueMap_{};
 
     public:
 
@@ -167,8 +168,9 @@ export namespace helios::opengl {
             auto viewportHandle = renderPassContext.viewportHandle;
 
             currentViewportHandle_ = viewportHandle;
-            passUniformValueMap_.set(UniformSemantics::ProjectionMatrix, renderPassContext.projectionMatrix);
-            passUniformValueMap_.set(UniformSemantics::ViewMatrix, renderPassContext.viewMatrix);
+
+            passUniformValueBag_.set<ProjectionMatrixUniform>(renderPassContext.projectionMatrix);
+            passUniformValueBag_.set<ViewMatrixUniform>(renderPassContext.viewMatrix);
 
             auto framebufferHandle = renderPassContext.framebufferHandle;
 
@@ -267,7 +269,7 @@ export namespace helios::opengl {
                 }
 
                 glUseProgram(openglShader->programId);
-                writeUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueMap_);
+                writeUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueBag_);
                 currentShaderHandle_ = shaderHandle;
             }
 
@@ -279,7 +281,7 @@ export namespace helios::opengl {
                 } else {
                     auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
                     if (colorComponent) {
-                        drawUniformValueMap_.set(UniformSemantics::MaterialBaseColor, colorComponent->value());
+                        drawUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
                     }
 
                     currentMaterialHandle_ = materialHandle;
@@ -305,8 +307,8 @@ export namespace helios::opengl {
                 }
             }
 
-            drawUniformValueMap_.set(UniformSemantics::ModelMatrix, renderContext.worldMatrix);
-            writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueMap_);
+            drawUniformValueBag_.set<ModelMatrixUniform>(renderContext.worldMatrix);
+            writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
 
 
             glDrawElements(
@@ -321,27 +323,36 @@ export namespace helios::opengl {
         /**
          * @brief Uploads cached uniform values for a specific uniform scope.
          *
-         * @details Resolves `OpenGLUniformLocationComponent<ShaderHandle, TUniformScope>`
-         * on the shader entity and writes matching values from `uniformValueMap`
-         * to all cached OpenGL uniform locations. Locations with `-1` are skipped.
+         * @details Resolves `OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>`
+         * on the shader entity and forwards its operation list plus values from
+         * `UniformValueBag` to `OpenGLUniformWriter`. If no write-plan component
+         * exists, the method logs an error and asserts in debug builds.
          *
          * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
          * @param shaderEntity Shader entity holding location cache and shader data.
-         * @param uniformValueMap Source values to upload for this scope.
+         * @param uniformValueBag Source values to upload for this scope.
          */
         template<typename TUniformScope>
-        void writeUniformValues(ShaderEntity shaderEntity, UniformValueMap<TUniformScope>& uniformValueMap) {
+        void writeUniformValues(ShaderEntity shaderEntity, UniformValueBag<TUniformScope>& uniformValueBag) {
 
-            auto* ulc = shaderEntity.get<OpenGLUniformLocationComponent<ShaderHandle, TUniformScope>>();
+            auto* ulc = shaderEntity.get<OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>>();
 
-            uniformWriter_.writeUniformValues(ulc, uniformValueMap);
+            if (!ulc) {
+                logger_.error("OpenGLUniformWritePlanComponent<{0}> expected, but not found", typeid(TUniformScope).name());
+                assert(false && "OpenGLUniformWritePlanComponent not found");
+                return;
+            }
+
+            OpenGLUniformWriter::write(ulc->operations, uniformValueBag);
         }
 
         /**
          * @brief Ends the current render pass.
          *
          * @details
-         * Restores transient OpenGL state enabled in `beginRenderPass`.
+         * Restores transient OpenGL state enabled in `beginRenderPass` and resets
+         * cached backend state (active handles, mesh pointer, and uniform bags)
+         * so the next pass starts from a clean baseline.
          *
          * @param renderPassContext Render pass target context.
          */
@@ -356,8 +367,8 @@ export namespace helios::opengl {
             currentMaterialHandle_ = MaterialHandle{};
             currentMeshHandle_     = MeshHandle{};
             currentOpenGLMesh_     = nullptr;
-            passUniformValueMap_.clear();
-            drawUniformValueMap_.clear();
+            passUniformValueBag_.clearValues();
+            drawUniformValueBag_.clearValues();
         }
 
         /**
