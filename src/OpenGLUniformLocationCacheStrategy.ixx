@@ -1,6 +1,6 @@
 /**
  * @file OpenGLUniformLocationCacheStrategy.ixx
- * @brief Strategy that resolves and caches OpenGL uniform locations for shaders.
+ * @brief Strategy that resolves shader uniform names into OpenGL write-operation plans.
  */
 module;
 
@@ -14,15 +14,17 @@ import helios.engine.rendering.shader.components.UniformMappingsComponent;
 import helios.engine.runtime.world.EngineWorld;
 import helios.engine.runtime.world.UpdateContext;
 import helios.engine.rendering.shader.concepts.IsShaderHandle;
+import helios.engine.rendering.shader.types;
 
 import helios.engine.util.log;
 
-import helios.opengl.components.OpenGLUniformLocationComponent;
+import helios.opengl.components.OpenGLUniformWriteOperationsComponent;
 import helios.opengl.components.OpenGLShaderComponent;
 
 using namespace helios::engine::runtime::world;
 using namespace helios::engine::rendering::shader::concepts;
 using namespace helios::engine::rendering::shader::components;
+using namespace helios::engine::rendering::shader::types;
 using namespace helios::engine::util::log;
 using namespace helios::opengl::components;
 
@@ -30,7 +32,7 @@ using namespace helios::opengl::components;
 export namespace helios::opengl {
 
     /**
-     * @brief Caches resolved OpenGL uniform locations for one shader entity.
+     * @brief Builds OpenGL uniform write-operation plans for one shader entity.
      * @tparam THandle Shader handle type.
      */
     template<typename THandle>
@@ -43,13 +45,15 @@ export namespace helios::opengl {
 
 
         /**
-         * @brief Resolves configured uniform names and stores their OpenGL locations.
+         * @brief Resolves configured uniform names and stores write operations.
+         * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
          * @param entityHandle Shader entity handle.
          * @param renderResourceWorld Render-resource world containing shader entities.
          * @param updateContext Frame-local update context.
-         * @return `true` on successful cache pass, otherwise `false`.
-         * @details Reads `UniformMappingsComponent`, queries locations via `glGetUniformLocation`,
-         * writes results into `OpenGLUniformLocationComponent`, and removes the mapping
+         * @return `true` when mapping processing completed, otherwise `false`.
+         * @details Reads `UniformMappingsComponent`, queries locations via
+         * `glGetUniformLocation`, appends resolved entries to
+         * `OpenGLUniformWriteOperationsComponent`, and removes the mapping
          * component after processing.
          */
         template<typename TUniformScope>
@@ -80,16 +84,16 @@ export namespace helios::opengl {
 
             GLuint programId = osc->programId;
 
-            auto& ulc = shaderEntity->template getOrAdd<OpenGLUniformLocationComponent<THandle, TUniformScope>>();
+            auto& ulc = shaderEntity->template getOrAdd<OpenGLUniformWriteOperationsComponent<THandle, TUniformScope>>();
 
             for (std::size_t i = 0; i < umc->mappings.size(); ++i ) {
                 if (!umc->mappings[i].empty()) {
                     GLint location = glGetUniformLocation(programId, umc->mappings[i].c_str());
                     if (location != -1) {
-                        ulc.locations[i] =  location;
-                        logger_.warn("Assigning uniform for {0} to {1}", umc->mappings[i], location);
+                        ulc.operations.emplace_back(static_cast<UniformSemantics>(i),  location);
+                        logger_.warn("Assigning uniform to plan: {0} to {1}", umc->mappings[i], location);
                     } else {
-                        logger_.warn("Expected uniform for {0}, but found nothing", umc->mappings[i]);
+                        logger_.warn("Assigning uniform to plan failed. Expected uniform for {0}, but found nothing", umc->mappings[i]);
                     }
 
                 }
