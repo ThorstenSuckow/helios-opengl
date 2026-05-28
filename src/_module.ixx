@@ -6,10 +6,11 @@
 export module helios.opengl;
 
 export import helios.opengl.components;
+export import helios.opengl.types;
 
 export import helios.opengl.OpenGLBackend;
 export import helios.opengl.OpenGLShaderCompileManager;
 export import helios.opengl.OpenGLMeshUploadManager;
 export import helios.opengl.OpenGLEnumMapper;
 export import helios.opengl.OpenGLUniformLocationCacheStrategy;
-export import helios.opengl.OpenGLUniformLocationWriter;
+export import helios.opengl.OpenGLUniformWriter;
