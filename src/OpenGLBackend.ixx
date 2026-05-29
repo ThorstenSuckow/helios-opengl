@@ -10,8 +10,9 @@ module;
 #include <cassert>
 #include <utility>
 #include <type_traits>
+#include <span>
 #include "helios-opengl-config.h"
-
+#include <optional>
 
 export module helios.opengl.OpenGLBackend;
 
@@ -21,6 +22,9 @@ import helios.math;
 
 import helios.engine.util.log;
 
+import helios.engine.rendering.viewport.ViewportEntity;
+
+import helios.engine.rendering.renderTarget.RenderTargetEntity;
 import helios.engine.rendering.common.types;
 import helios.engine.rendering.common.components;
 
@@ -36,11 +40,12 @@ import helios.opengl.types;
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
 import helios.engine.rendering.material;
-import helios.engine.rendering.framebuffer;
+import helios.engine.rendering.renderTarget;
 import helios.engine.rendering.viewport;
 import helios.engine.util.Colors;
 
-import helios.engine.scene.types.SceneMemberRenderContext;
+import helios.engine.scene.components;
+import helios.engine.scene.types;
 
 import helios.engine.runtime.world.EngineWorld;
 
@@ -59,8 +64,11 @@ using namespace helios::engine::rendering::material::types;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::engine::rendering::common::components;
 using namespace helios::engine::rendering::mesh::types;
-using namespace helios::engine::rendering::framebuffer::types;
+using namespace helios::engine::rendering::renderTarget;
+using namespace helios::engine::rendering::renderTarget::types;
+using namespace helios::engine::rendering::viewport;
 using namespace helios::engine::rendering::viewport::types;
+using namespace helios::engine::scene::components;
 using namespace helios::engine::scene::types;
 using namespace helios::engine::runtime::world;
 using namespace helios::engine::util::log;
@@ -80,15 +88,6 @@ export namespace helios::opengl {
     class OpenGLBackend {
     private:
 
-        /**
-         * @brief Render-resource ECS world (meshes, shaders, materials).
-         */
-        RenderResourceWorld& renderResourcesWorld_;
-
-        /**
-         * @brief Render-target ECS world (framebuffers, viewports).
-         */
-        RenderTargetWorld& renderTargetsWorld_;
 
         /**
          * @brief Tracks whether GL function pointers were initialized.
@@ -123,16 +122,66 @@ export namespace helios::opengl {
          * @brief Cached pointer to the currently bound OpenGL mesh component.
          */
         OpenGLMeshComponent<MeshHandle>* currentOpenGLMesh_ = nullptr;
-        
+
         /**
          * @brief Cached pass-scope uniforms (typically view/projection).
          */
-         UniformValueBag<UniformScope::Pass> passUniformValueBag_{};
+        UniformValueBag<UniformScope::Pass> passUniformValueBag_{};
 
         /**
          * @brief Cached draw-scope uniforms (for example model matrix/material color).
          */
-         UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
+        UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
+
+        RenderTargetHandle currentRenderTargetHandle_{};
+
+        EngineWorld& engineWorld_;
+
+        /**
+         * @brief Per-viewport camera matrices used for a render pass.
+         */
+        struct ViewProjection {
+            helios::math::mat4f viewMatrix;
+            helios::math::mat4f projectionMatrix;
+        };
+
+        /**
+         * @brief Resolves view and projection matrices for a viewport's bound camera.
+         *
+         * @param updateContext Current frame update context.
+         * @param viewportHandle Viewport to resolve camera matrices for.
+         * @return View/projection pair on success, otherwise `std::nullopt`.
+         */
+        [[nodiscard]] std::optional<ViewProjection> viewProjection(const ViewportEntity& vieportEntity) const noexcept {
+
+            auto* cbc = vieportEntity.get<CameraBindingComponent<ViewportHandle>>();
+            if (!cbc) {
+                logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
+                return std::nullopt;
+            }
+            auto camera = engineWorld_.find(cbc->targetHandle());
+            if (!camera) {
+                logger_.error("Expected CameraEntity, but couldn't find any.");
+                return std::nullopt;
+            }
+            using CameryHandleType = std::remove_cvref_t<decltype(cbc->targetHandle())>;
+            auto* vm = camera->get<ViewMatrixComponent<CameryHandleType>>();
+            if (!vm) {
+                logger_.error("Expected ViewMatrixComponent, but couldn't find any.");
+                return std::nullopt;
+            }
+
+            auto* pm = camera->get<ProjectionMatrixComponent<CameryHandleType>>();
+            if (!pm) {
+                logger_.error("Expected ProjectionMatrixComponent, but couldn't find any.");
+                return std::nullopt;
+            }
+
+            return ViewProjection{
+                vm->value(), pm->value()
+            };
+
+        }
 
 
     public:
@@ -145,93 +194,115 @@ export namespace helios::opengl {
          * @param renderResourcesWorld Render resource world.
          * @param renderTargetsWorld Render target world.
          */
-        explicit OpenGLBackend(
-            RenderResourceWorld& renderResourcesWorld,
-            RenderTargetWorld& renderTargetsWorld
-        ) :
-        renderResourcesWorld_(renderResourcesWorld),
-        renderTargetsWorld_(renderTargetsWorld)
-        {}
+        explicit OpenGLBackend(EngineWorld& engineWorld) : engineWorld_(engineWorld){}
 
 
         /**
-         * @brief Begins a render pass and configures framebuffer, viewport, and clear state.
+         * @brief Begins a render pass and configures renderTarget, viewport, and clear state.
          *
          * @details
-         * In debug builds, missing entities and invalid framebuffer handles are
+         * In debug builds, missing entities and invalid renderTarget handles are
          * reported and asserted. The clear mask is derived from `ClearFlags`.
          *
          * @param renderPassContext Render pass target context.
          */
-        void beginRenderPass(const RenderPassContext& renderPassContext) {
+        void beginRenderTargetBatch(const RenderTargetHandle renderTargetHandle) {
 
-            auto viewportHandle = renderPassContext.viewportHandle;
-
-            currentViewportHandle_ = viewportHandle;
-
-            passUniformValueBag_.set<ProjectionMatrixUniform>(renderPassContext.projectionMatrix);
-            passUniformValueBag_.set<ViewMatrixUniform>(renderPassContext.viewMatrix);
-
-            auto framebufferHandle = renderPassContext.framebufferHandle;
-
-            auto viewport = renderTargetsWorld_.findEntity<ViewportHandle>(viewportHandle);
-            auto framebuffer = renderTargetsWorld_.findEntity<FramebufferHandle>(framebufferHandle);
+            auto renderTargetEntity = engineWorld_.find<RenderTargetHandle>(renderTargetHandle);
 
             #ifdef HELIOS_DEBUG
-            if (!viewport) {
-                logger_.error("Missing Viewport for handle {0}.", viewportHandle.entityId);
-                assert(viewport && "Missing Viewport for handle.");
-            }
-            if (!framebuffer) {
-                logger_.error("Missing Framebuffer for handle {0}.", framebufferHandle.entityId);
-                assert(framebuffer && "Missing Framebuffer for handle.");
+            if (!renderTargetEntity) {
+                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetHandle.entityId);
+                assert(renderTargetEntity && "Missing RenderTargetEntity for handle.");
             }
             #endif
 
-            const auto clearColor = framebuffer->get<ColorComponent<FramebufferHandle>>()->value();
-            const auto clearFlags = std::to_underlying(framebuffer->get<ClearComponent<FramebufferHandle>>()->flags);
-            const auto framebufferId = framebuffer->get<OpenGLFramebufferIdComponent<FramebufferHandle>>()->value();
+            currentRenderTargetHandle_ = renderTargetHandle;
 
-            auto viewportBounds  = viewport->get<BoundsComponent<ViewportHandle>>()->value();
-            auto framebufferSize = framebuffer->get<Size2DComponent<FramebufferHandle>>()->value();
+            const auto renderTargetId = renderTargetEntity->get<OpenGLRenderTargetIdComponent<RenderTargetHandle>>()->value();
 
-            glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
+            glBindFramebuffer(GL_FRAMEBUFFER, renderTargetId);
 
             #ifdef HELIOS_DEBUG
-            const auto isValidFramebuffer = framebufferId == 0 ||
-                (glIsFramebuffer(framebufferId) == GL_TRUE && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-            if (!isValidFramebuffer) {
-                logger_.error("Framebuffer with id {0} undefined.", framebufferId);
-                assert(isValidFramebuffer && "Framebuffer id does not seem to be a valid id.");
+            const auto isValidRenderTarget = renderTargetId == 0 ||
+                (glIsFramebuffer(renderTargetId) == GL_TRUE && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+            if (!isValidRenderTarget) {
+                logger_.error("RenderTargetEntity with EntityId {0} undefined.", renderTargetId);
+                assert(isValidRenderTarget && "RenderTargetEntity EntityId does not seem to be a valid id.");
             }
             #endif
-
 
             // this is equally important for the GlpyhTextRenderer
             // enable blending since the font's fragment shader uses the alpha channel
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+            const auto clearColor = renderTargetEntity->get<ColorComponent<RenderTargetHandle>>()->value();
             glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        }
 
-            const auto x = static_cast<int>(framebufferSize[0] * viewportBounds[0]);
-            const auto y = static_cast<int>(framebufferSize[1] * viewportBounds[1]);
-            const auto width = static_cast<int>(framebufferSize[0] * viewportBounds[2]);
-            const auto height = static_cast<int>(framebufferSize[1] * viewportBounds[3]);
+        void endRenderTargetBatch(const RenderTargetHandle renderTargetHandle) {
 
-            const auto clearMask = ((clearFlags & std::to_underlying(ClearFlags::Color)) ? GL_COLOR_BUFFER_BIT : 0) |
-                ((clearFlags & std::to_underlying(ClearFlags::Depth)) ? GL_DEPTH_BUFFER_BIT : 0) |
-                ((clearFlags & std::to_underlying(ClearFlags::Stencil)) ? GL_STENCIL_BUFFER_BIT : 0);
+            glBindVertexArray(0);
+
+            currentRenderTargetHandle_ = RenderTargetHandle{};
+            passUniformValueBag_.clearValues();
+            drawUniformValueBag_.clearValues();
+        }
+
+        void beginViewportBatch(const ViewportHandle viewportHandle) {
+
+            auto viewport = engineWorld_.find<ViewportHandle>(viewportHandle);
+            auto renderTargetEntity = engineWorld_.find<RenderTargetHandle>(currentRenderTargetHandle_);
+
+            #ifdef HELIOS_DEBUG
+            if (!renderTargetEntity) {
+                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetEntity->handle().entityId);
+                assert(renderTargetEntity && "Missing RenderTargetEntity for handle.");
+            }
+            if (!viewport) {
+                logger_.error("Missing Viewport for handle {0}.", viewportHandle.entityId);
+                assert(viewport && "Missing Viewport for handle.");
+            }
+            #endif
+
+            auto vp = viewProjection(*viewport);
+            if (!vp) {
+                logger_.warn("Could not determine View/Projection-matrices for RenderPass");
+                passUniformValueBag_.set<ProjectionMatrixUniform>(helios::math::mat4f{1.0f});
+                passUniformValueBag_.set<ViewMatrixUniform>(helios::math::mat4f{1.0f});
+            } else {
+                passUniformValueBag_.set<ProjectionMatrixUniform>(vp->projectionMatrix);
+                passUniformValueBag_.set<ViewMatrixUniform>(vp->viewMatrix);
+            }
+
+            auto viewportBounds  = viewport->get<BoundsComponent<ViewportHandle>>()->value();
+            auto renderTargetSize = renderTargetEntity->get<Size2DComponent<RenderTargetHandle>>()->value();
+
+            const auto x = static_cast<int>(renderTargetSize[0] * viewportBounds[0]);
+            const auto y = static_cast<int>(renderTargetSize[1] * viewportBounds[1]);
+            const auto width = static_cast<int>(renderTargetSize[0] * viewportBounds[2]);
+            const auto height = static_cast<int>(renderTargetSize[1] * viewportBounds[3]);
+
 
             glViewport(x, y, width, height);
             glScissor(x, y, width, height);
             glEnable(GL_SCISSOR_TEST);
+
+            const auto clearFlags = std::to_underlying(renderTargetEntity->get<ClearComponent<RenderTargetHandle>>()->flags);
+            const auto clearMask = ((clearFlags & std::to_underlying(ClearFlags::Color)) ? GL_COLOR_BUFFER_BIT : 0) |
+               ((clearFlags & std::to_underlying(ClearFlags::Depth)) ? GL_DEPTH_BUFFER_BIT : 0) |
+               ((clearFlags & std::to_underlying(ClearFlags::Stencil)) ? GL_STENCIL_BUFFER_BIT : 0);
+
             if (clearMask != 0) {
                 glClear(clearMask);
             }
-
-
         }
+
+        void endViewportBatch(const ViewportHandle viewportHandle) {
+            glDisable(GL_SCISSOR_TEST);
+        }
+
 
         /**
          * @brief Renders one extracted scene member.
@@ -253,7 +324,7 @@ export namespace helios::opengl {
             auto shaderHandle = renderContext.shaderHandle;
             auto materialHandle = renderContext.materialHandle;
 
-            auto shaderEntity = renderResourcesWorld_.findEntity(shaderHandle);
+            auto shaderEntity = engineWorld_.find(shaderHandle);
             if (!shaderEntity) {
                 logger_.error("ShaderEntity expected, but not found");
                 assert(false && "ShaderEntity not found");
@@ -274,7 +345,7 @@ export namespace helios::opengl {
             }
 
             if (currentMaterialHandle_ != materialHandle) {
-                auto materialEntity = renderResourcesWorld_.findEntity(materialHandle);
+                auto materialEntity = engineWorld_.find(materialHandle);
                 if (!materialEntity) {
                     logger_.error("MaterialEntity expected, but not found");
                     assert(false && "MaterialEntity not found");
@@ -289,7 +360,7 @@ export namespace helios::opengl {
             }
 
             if (currentMeshHandle_ != meshHandle) {
-                auto meshEntity = renderResourcesWorld_.findEntity(meshHandle);
+                auto meshEntity = engineWorld_.find(meshHandle);
                 if (!meshEntity) {
                     logger_.error("MeshEntity expected, but not found");
                     assert(false && "MeshEntity not found");
@@ -346,29 +417,16 @@ export namespace helios::opengl {
             OpenGLUniformWriter::write(ulc->operations, uniformValueBag);
         }
 
-        /**
-         * @brief Ends the current render pass.
-         *
-         * @details
-         * Restores transient OpenGL state enabled in `beginRenderPass` and resets
-         * cached backend state (active handles, mesh pointer, and uniform bags)
-         * so the next pass starts from a clean baseline.
-         *
-         * @param renderPassContext Render pass target context.
-         */
-        void endRenderPass(const RenderPassContext& renderPassContext) {
 
-            glDisable(GL_SCISSOR_TEST);
-            glBindVertexArray(0);
+        void beginShaderBatch(ShaderHandle handle) {}
+        void endShaderBatch(ShaderHandle handle) {}
+        void beginMaterialBatch(MaterialHandle handle) {}
+        void endMaterialBatch(MaterialHandle handle) {}
+        void beginMeshBatch(MeshHandle handle) {}
+        void endMeshBatch(MeshHandle handle) {}
+        template<typename THandle>
+        void renderBatch(std::span<SceneMemberRenderContext<THandle>> sceneMemberRenderContexts) {
 
-            // new ViewportHandle -> invalid
-            currentViewportHandle_ = ViewportHandle{};
-            currentShaderHandle_   = ShaderHandle{};
-            currentMaterialHandle_ = MaterialHandle{};
-            currentMeshHandle_     = MeshHandle{};
-            currentOpenGLMesh_     = nullptr;
-            passUniformValueBag_.clearValues();
-            drawUniformValueBag_.clearValues();
         }
 
         /**
