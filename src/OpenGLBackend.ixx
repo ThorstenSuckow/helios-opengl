@@ -81,8 +81,7 @@ export namespace helios::opengl {
     /**
      * @brief Applies render-pass state and executes OpenGL draw calls.
      *
-     * @details
-     * `OpenGLBackend` is intentionally thin and stateful: it references existing
+     * @details `OpenGLBackend` is intentionally thin and stateful: it references existing
      * worlds and translates ECS render data into OpenGL state changes.
      */
     class OpenGLBackend {
@@ -217,8 +216,7 @@ export namespace helios::opengl {
         /**
          * @brief Begins processing for one render-target batch.
          *
-         * @details
-         * Binds the framebuffer, validates it in debug builds, and initializes
+         * @details Binds the framebuffer, validates it in debug builds, and initializes
          * pass-independent GL state such as blending and clear color.
          *
          * @param renderTargetHandle Render-target handle for this batch.
@@ -261,8 +259,7 @@ export namespace helios::opengl {
         /**
          * @brief Ends processing for one render-target batch.
          *
-         * @details
-         * Clears current render-target state and resets cached pass/draw uniform values.
+         * @details Clears current render-target state and resets cached pass/draw uniform values.
          *
          * @param renderTargetHandle Render-target handle for this batch.
          */
@@ -276,8 +273,7 @@ export namespace helios::opengl {
         /**
          * @brief Begins processing for one viewport batch.
          *
-         * @details
-         * Resolves camera matrices, configures viewport/scissor rectangles, and performs
+         * @details Resolves camera matrices, configures viewport/scissor rectangles, and performs
          * optional clears according to the active render target clear flags.
          *
          * @param viewportHandle Viewport handle for this batch.
@@ -343,8 +339,7 @@ export namespace helios::opengl {
         /**
          * @brief Begins processing for one shader batch.
          *
-         * @details
-         * Binds the shader program and uploads pass-scope uniforms.
+         * @details Binds the shader program and uploads pass-scope uniforms.
          *
          * @param shaderHandle Shader handle for this batch.
          */
@@ -382,8 +377,7 @@ export namespace helios::opengl {
         /**
          * @brief Begins processing for one material batch.
          *
-         * @details
-         * Loads material-scope values (for example base color) into draw-scope uniforms.
+         * @details Loads material-scope values (for example base color) into draw-scope uniforms.
          *
          * @param materialHandle Material handle for this batch.
          */
@@ -414,8 +408,7 @@ export namespace helios::opengl {
         /**
          * @brief Begins processing for one mesh batch.
          *
-         * @details
-         * Resolves and binds the mesh VAO used for all draw contexts in the batch.
+         * @details Resolves and binds the mesh VAO used for all draw contexts in the batch.
          *
          * @param meshHandle Mesh handle for this batch.
          */
@@ -452,8 +445,7 @@ export namespace helios::opengl {
         /**
          * @brief Renders all draw contexts of the current mesh batch.
          *
-         * @details
-         * Writes draw-scope uniforms per context and submits one indexed
+         * @details Writes draw-scope uniforms per context and submits one indexed
          * `glDrawElements` call per entry.
          *
          * @tparam THandle Scene member handle type.
@@ -490,13 +482,10 @@ export namespace helios::opengl {
             }
         }
 
-
-
         /**
          * @brief Applies window hints for an OpenGL core-profile context.
          *
-         * @details
-         * The backend currently requests OpenGL 4.1 core profile for macOS
+         * @details The backend currently requests OpenGL 4.1 core profile for macOS
          * compatibility.
          */
         void provideWindowHints() noexcept {
@@ -540,9 +529,6 @@ export namespace helios::opengl {
         [[nodiscard]] bool isInitialized() const noexcept {
             return isInitialized_;
         }
-
-
-
 
     };
 } // namespace helios::opengl
