@@ -98,26 +98,6 @@ export namespace helios::opengl {
             HELIOS_LOG_SCOPE
         );
 
-
-        /**
-         * @brief Currently active viewport for pass consistency checks.
-         */
-        ViewportHandle currentViewportHandle_{};
-        /**
-         * @brief Currently bound shader to avoid redundant `glUseProgram` calls.
-         */
-        ShaderHandle currentShaderHandle_{};
-
-        /**
-         * @brief Currently bound material to avoid redundant material updates.
-         */
-        MaterialHandle currentMaterialHandle_{};
-
-        /**
-         * @brief Currently bound mesh handle to avoid redundant VAO binds.
-         */
-        MeshHandle currentMeshHandle_{};
-
         /**
          * @brief Cached pointer to the currently bound OpenGL mesh component.
          */
@@ -133,8 +113,20 @@ export namespace helios::opengl {
          */
         UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
 
+        /**
+         * @brief Currently active render target for nested viewport processing.
+         */
         RenderTargetHandle currentRenderTargetHandle_{};
 
+        /**
+         * @brief Currently bound shader to avoid redundant `glUseProgram` calls.
+         */
+        ShaderHandle currentShaderHandle_{};
+
+
+        /**
+         * @brief Engine world used to resolve render entities and components.
+         */
         EngineWorld& engineWorld_;
 
         /**
@@ -183,30 +175,55 @@ export namespace helios::opengl {
 
         }
 
+        /**
+         * @brief Uploads cached uniform values for a specific uniform scope.
+         *
+         * @details Resolves `OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>`
+         * on the shader entity and forwards its operation list plus values from
+         * `UniformValueBag` to `OpenGLUniformWriter`. If no write-plan component
+         * exists, the method logs an error and asserts in debug builds.
+         *
+         * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
+         * @param shaderEntity Shader entity holding location cache and shader data.
+         * @param uniformValueBag Source values to upload for this scope.
+         */
+        template<typename TUniformScope>
+        void writeUniformValues(ShaderEntity shaderEntity, UniformValueBag<TUniformScope>& uniformValueBag) noexcept {
+
+            auto* ulc = shaderEntity.get<OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>>();
+
+            if (!ulc) {
+                logger_.error("OpenGLUniformWritePlanComponent<{0}> expected, but not found", typeid(TUniformScope).name());
+                assert(false && "OpenGLUniformWritePlanComponent not found");
+                return;
+            }
+
+            OpenGLUniformWriter::write(ulc->operations, uniformValueBag);
+        }
+
 
     public:
 
 
 
         /**
-         * @brief Constructs the backend from render resource and target worlds.
+         * @brief Constructs the backend bound to the engine world.
          *
-         * @param renderResourcesWorld Render resource world.
-         * @param renderTargetsWorld Render target world.
+         * @param engineWorld Engine world providing render resources and targets.
          */
         explicit OpenGLBackend(EngineWorld& engineWorld) : engineWorld_(engineWorld){}
 
 
         /**
-         * @brief Begins a render pass and configures renderTarget, viewport, and clear state.
+         * @brief Begins processing for one render-target batch.
          *
          * @details
-         * In debug builds, missing entities and invalid renderTarget handles are
-         * reported and asserted. The clear mask is derived from `ClearFlags`.
+         * Binds the framebuffer, validates it in debug builds, and initializes
+         * pass-independent GL state such as blending and clear color.
          *
-         * @param renderPassContext Render pass target context.
+         * @param renderTargetHandle Render-target handle for this batch.
          */
-        void beginRenderTargetBatch(const RenderTargetHandle renderTargetHandle) {
+        void beginRenderTargetBatch(const RenderTargetHandle renderTargetHandle) noexcept {
 
             auto renderTargetEntity = engineWorld_.find<RenderTargetHandle>(renderTargetHandle);
 
@@ -241,16 +258,31 @@ export namespace helios::opengl {
             glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         }
 
-        void endRenderTargetBatch(const RenderTargetHandle renderTargetHandle) {
-
-            glBindVertexArray(0);
+        /**
+         * @brief Ends processing for one render-target batch.
+         *
+         * @details
+         * Clears current render-target state and resets cached pass/draw uniform values.
+         *
+         * @param renderTargetHandle Render-target handle for this batch.
+         */
+        void endRenderTargetBatch(const RenderTargetHandle renderTargetHandle) noexcept {
 
             currentRenderTargetHandle_ = RenderTargetHandle{};
             passUniformValueBag_.clearValues();
             drawUniformValueBag_.clearValues();
         }
 
-        void beginViewportBatch(const ViewportHandle viewportHandle) {
+        /**
+         * @brief Begins processing for one viewport batch.
+         *
+         * @details
+         * Resolves camera matrices, configures viewport/scissor rectangles, and performs
+         * optional clears according to the active render target clear flags.
+         *
+         * @param viewportHandle Viewport handle for this batch.
+         */
+        void beginViewportBatch(const ViewportHandle viewportHandle) noexcept {
 
             auto viewport = engineWorld_.find<ViewportHandle>(viewportHandle);
             auto renderTargetEntity = engineWorld_.find<RenderTargetHandle>(currentRenderTargetHandle_);
@@ -299,30 +331,24 @@ export namespace helios::opengl {
             }
         }
 
-        void endViewportBatch(const ViewportHandle viewportHandle) {
+        /**
+         * @brief Ends processing for one viewport batch.
+         *
+         * @param viewportHandle Viewport handle for this batch.
+         */
+        void endViewportBatch(const ViewportHandle viewportHandle) noexcept {
             glDisable(GL_SCISSOR_TEST);
         }
 
-
         /**
-         * @brief Renders one extracted scene member.
+         * @brief Begins processing for one shader batch.
          *
          * @details
-         * Resolves shader and mesh entities from render-resource handles, validates
-         * expected OpenGL components in debug/error paths, binds program and VAO,
-         * and submits one indexed `glDrawElements` call.
+         * Binds the shader program and uploads pass-scope uniforms.
          *
-         * @tparam THandle Scene member handle type.
-         * @param renderContext Per-member render context.
+         * @param shaderHandle Shader handle for this batch.
          */
-        template<typename THandle>
-        void doRender(const SceneMemberRenderContext<THandle>& renderContext)  {
-
-            assert(renderContext.viewportHandle == currentViewportHandle_ && "ViewportHandle out of sync");
-
-            auto meshHandle = renderContext.meshHandle;
-            auto shaderHandle = renderContext.shaderHandle;
-            auto materialHandle = renderContext.materialHandle;
+        void beginShaderBatch(ShaderHandle shaderHandle) noexcept {
 
             auto shaderEntity = engineWorld_.find(shaderHandle);
             if (!shaderEntity) {
@@ -331,103 +357,140 @@ export namespace helios::opengl {
                 return;
             }
 
-            if (currentShaderHandle_ != shaderHandle) {
-                auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle>>();
-                if (!openglShader) {
-                    logger_.error("OpenGLShader expected, but not found");
-                    assert(false && "OpenGLShader not found");
-                    return;
-                }
+            currentShaderHandle_ = shaderHandle;
 
-                glUseProgram(openglShader->programId);
-                writeUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueBag_);
-                currentShaderHandle_ = shaderHandle;
+            auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle>>();
+            if (!openglShader) {
+                logger_.error("OpenGLShader expected, but not found");
+                assert(false && "OpenGLShader not found");
+                return;
             }
 
-            if (currentMaterialHandle_ != materialHandle) {
-                auto materialEntity = engineWorld_.find(materialHandle);
-                if (!materialEntity) {
-                    logger_.error("MaterialEntity expected, but not found");
-                    assert(false && "MaterialEntity not found");
-                } else {
-                    auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
-                    if (colorComponent) {
-                        drawUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
-                    }
+            glUseProgram(openglShader->programId);
+            writeUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueBag_);
+        }
 
-                    currentMaterialHandle_ = materialHandle;
-                }
+        /**
+         * @brief Ends processing for one shader batch.
+         *
+         * @param handle Shader handle for this batch.
+         */
+        void endShaderBatch(ShaderHandle handle) noexcept {
+            currentShaderHandle_ = ShaderHandle{};
+        }
+
+        /**
+         * @brief Begins processing for one material batch.
+         *
+         * @details
+         * Loads material-scope values (for example base color) into draw-scope uniforms.
+         *
+         * @param materialHandle Material handle for this batch.
+         */
+        void beginMaterialBatch(MaterialHandle materialHandle) noexcept {
+            auto materialEntity = engineWorld_.find(materialHandle);
+            if (!materialEntity) {
+                logger_.error("MaterialEntity expected, but not found");
+                assert(false && "MaterialEntity not found");
+                return;
             }
 
-            if (currentMeshHandle_ != meshHandle) {
-                auto meshEntity = engineWorld_.find(meshHandle);
-                if (!meshEntity) {
-                    logger_.error("MeshEntity expected, but not found");
-                    assert(false && "MeshEntity not found");
-                } else {
-                    auto* openglMesh = meshEntity->template get<OpenGLMeshComponent<MeshHandle>>();
-                    if (!openglMesh) {
-                        logger_.error("OpenGLMesh expected, but not found");
-                        assert(false && "OpenGLMesh not found");
-                        return;
-                    } else {
-                        currentOpenGLMesh_ = openglMesh;
-                        glBindVertexArray(openglMesh->vao);
-                        currentMeshHandle_  = meshHandle;
-                    }
-                }
+            auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
+            if (colorComponent) {
+                drawUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
             }
-
-            drawUniformValueBag_.set<ModelMatrixUniform>(renderContext.worldMatrix);
-            writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
-
-
-            glDrawElements(
-                currentOpenGLMesh_->primitiveType,
-                currentOpenGLMesh_->indexCount,
-                GL_UNSIGNED_INT,
-                nullptr
-            );
 
         }
 
         /**
-         * @brief Uploads cached uniform values for a specific uniform scope.
+         * @brief Ends processing for one material batch.
          *
-         * @details Resolves `OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>`
-         * on the shader entity and forwards its operation list plus values from
-         * `UniformValueBag` to `OpenGLUniformWriter`. If no write-plan component
-         * exists, the method logs an error and asserts in debug builds.
-         *
-         * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
-         * @param shaderEntity Shader entity holding location cache and shader data.
-         * @param uniformValueBag Source values to upload for this scope.
+         * @param handle Material handle for this batch.
          */
-        template<typename TUniformScope>
-        void writeUniformValues(ShaderEntity shaderEntity, UniformValueBag<TUniformScope>& uniformValueBag) {
+        void endMaterialBatch(MaterialHandle handle) noexcept {
+            // intentionally left empty
+        }
 
-            auto* ulc = shaderEntity.get<OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>>();
+        /**
+         * @brief Begins processing for one mesh batch.
+         *
+         * @details
+         * Resolves and binds the mesh VAO used for all draw contexts in the batch.
+         *
+         * @param meshHandle Mesh handle for this batch.
+         */
+        void beginMeshBatch(MeshHandle meshHandle) noexcept {
 
-            if (!ulc) {
-                logger_.error("OpenGLUniformWritePlanComponent<{0}> expected, but not found", typeid(TUniformScope).name());
-                assert(false && "OpenGLUniformWritePlanComponent not found");
+            auto meshEntity = engineWorld_.find(meshHandle);
+            if (!meshEntity) {
+                logger_.error("MeshEntity expected, but not found");
+                assert(false && "MeshEntity not found");
                 return;
             }
 
-            OpenGLUniformWriter::write(ulc->operations, uniformValueBag);
+            auto* openglMesh = meshEntity->template get<OpenGLMeshComponent<MeshHandle>>();
+            if (!openglMesh) {
+                logger_.error("OpenGLMesh expected, but not found");
+                assert(false && "OpenGLMesh not found");
+                return;
+            } else {
+                currentOpenGLMesh_ = openglMesh;
+                glBindVertexArray(openglMesh->vao);
+            }
         }
 
+        /**
+         * @brief Ends processing for one mesh batch.
+         *
+         * @param handle Mesh handle for this batch.
+         */
+        void endMeshBatch(MeshHandle handle) noexcept {
+            currentOpenGLMesh_ = nullptr;
+            glBindVertexArray(0);
+        }
 
-        void beginShaderBatch(ShaderHandle handle) {}
-        void endShaderBatch(ShaderHandle handle) {}
-        void beginMaterialBatch(MaterialHandle handle) {}
-        void endMaterialBatch(MaterialHandle handle) {}
-        void beginMeshBatch(MeshHandle handle) {}
-        void endMeshBatch(MeshHandle handle) {}
+        /**
+         * @brief Renders all draw contexts of the current mesh batch.
+         *
+         * @details
+         * Writes draw-scope uniforms per context and submits one indexed
+         * `glDrawElements` call per entry.
+         *
+         * @tparam THandle Scene member handle type.
+         * @param sceneMemberRenderContexts Draw contexts belonging to the active mesh batch.
+         */
         template<typename THandle>
-        void renderBatch(std::span<SceneMemberRenderContext<THandle>> sceneMemberRenderContexts) {
+        void renderBatch(std::span<SceneMemberRenderContext<THandle>> sceneMemberRenderContexts) noexcept {
 
+            if (!currentOpenGLMesh_) {
+                logger_.error("OpenGLMesh expected, but not available");
+                return;
+            }
+            if (!currentShaderHandle_.isValid()) {
+                logger_.error("Expected valid currentShaderHandle_, but found {0}.", currentShaderHandle_.entityId);
+                return;
+            }
+
+            auto shaderEntity = engineWorld_.find(currentShaderHandle_);
+
+            assert(shaderEntity && "ShaderEntity expected, but not found");
+            assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
+
+            for (auto& renderContext : sceneMemberRenderContexts) {
+
+                drawUniformValueBag_.set<ModelMatrixUniform>(renderContext.worldMatrix);
+                writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
+                glDrawElements(
+                    currentOpenGLMesh_->primitiveType,
+                    currentOpenGLMesh_->indexCount,
+                    GL_UNSIGNED_INT,
+                    nullptr
+                );
+
+            }
         }
+
+
 
         /**
          * @brief Applies window hints for an OpenGL core-profile context.
@@ -451,7 +514,7 @@ export namespace helios::opengl {
          * @post `isInitialized()` returns `true` on success.
          * @return `true` if loading succeeded, otherwise `false`.
          */
-        bool init() {
+        [[nodiscard]] bool init() noexcept {
 
             assert(!isInitialized_ && "Backend already initialized");
 
@@ -474,7 +537,7 @@ export namespace helios::opengl {
         /**
          * @brief Reports whether OpenGL function loading completed successfully.
          */
-        bool isInitialized() {
+        [[nodiscard]] bool isInitialized() const noexcept {
             return isInitialized_;
         }
 
