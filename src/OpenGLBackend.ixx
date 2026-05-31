@@ -16,8 +16,6 @@ module;
 
 export module helios.opengl.OpenGLBackend;
 
-import helios.ecs.types;
-
 import helios.math;
 
 import helios.engine.util.log;
@@ -72,7 +70,6 @@ using namespace helios::engine::scene::components;
 using namespace helios::engine::scene::types;
 using namespace helios::engine::runtime::world;
 using namespace helios::engine::util::log;
-using namespace helios::ecs::types;
 
 #define HELIOS_LOG_SCOPE "helios::opengl"
 export namespace helios::opengl {
