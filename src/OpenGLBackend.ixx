@@ -201,6 +201,38 @@ export namespace helios::opengl {
         }
 
 
+        /**
+         * @brief ClearColor/Mask based on available components.
+         *
+         * @tparam THandle
+         * @tparam TEntity
+         *
+         * @param entity
+         */
+        template<typename THandle, typename TEntity>
+        void clearColor(TEntity& entity) noexcept {
+
+            auto* colorComp = entity->template get<ColorComponent<THandle>>();
+            auto* clearComp = entity->template get<ClearComponent<THandle>>();
+
+            if (colorComp) {
+                const auto clearColor = colorComp->value();
+                glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+            }
+
+            if (clearComp) {
+                const auto clearFlags = std::to_underlying(clearComp->flags);
+                const auto clearMask = ((clearFlags & std::to_underlying(ClearFlags::Color)) ? GL_COLOR_BUFFER_BIT : 0) |
+                   ((clearFlags & std::to_underlying(ClearFlags::Depth)) ? GL_DEPTH_BUFFER_BIT : 0) |
+                   ((clearFlags & std::to_underlying(ClearFlags::Stencil)) ? GL_STENCIL_BUFFER_BIT : 0);
+
+                if (clearMask != 0) {
+                    glClear(clearMask);
+                }
+            }
+        }
+
+
     public:
 
 
@@ -247,13 +279,19 @@ export namespace helios::opengl {
             }
             #endif
 
+            auto renderTargetSize = renderTargetEntity->get<Size2DComponent<RenderTargetHandle>>()->value();
+
+            glViewport(0, 0,
+                static_cast<int>(renderTargetSize[0]),
+                static_cast<int>(renderTargetSize[1])
+            );
+
+            clearColor<RenderTargetHandle>(renderTargetEntity);
+
             // this is equally important for the GlpyhTextRenderer
             // enable blending since the font's fragment shader uses the alpha channel
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            const auto clearColor = renderTargetEntity->get<ColorComponent<RenderTargetHandle>>()->value();
-            glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         }
 
         /**
@@ -317,14 +355,7 @@ export namespace helios::opengl {
             glScissor(x, y, width, height);
             glEnable(GL_SCISSOR_TEST);
 
-            const auto clearFlags = std::to_underlying(renderTargetEntity->get<ClearComponent<RenderTargetHandle>>()->flags);
-            const auto clearMask = ((clearFlags & std::to_underlying(ClearFlags::Color)) ? GL_COLOR_BUFFER_BIT : 0) |
-               ((clearFlags & std::to_underlying(ClearFlags::Depth)) ? GL_DEPTH_BUFFER_BIT : 0) |
-               ((clearFlags & std::to_underlying(ClearFlags::Stencil)) ? GL_STENCIL_BUFFER_BIT : 0);
-
-            if (clearMask != 0) {
-                glClear(clearMask);
-            }
+            clearColor<ViewportHandle>(viewport);
         }
 
         /**
