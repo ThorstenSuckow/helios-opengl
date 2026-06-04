@@ -152,14 +152,14 @@ export namespace helios::opengl {
                 logger_.error("Expected CameraEntity, but couldn't find any.");
                 return std::nullopt;
             }
-            using CameryHandleType = std::remove_cvref_t<decltype(cbc->targetHandle())>;
-            auto* vm = camera->get<ViewMatrixComponent<CameryHandleType>>();
+            using CameraHandleType = std::remove_cvref_t<decltype(cbc->targetHandle())>;
+            auto* vm = camera->get<ViewMatrixComponent<CameraHandleType>>();
             if (!vm) {
                 logger_.error("Expected ViewMatrixComponent, but couldn't find any.");
                 return std::nullopt;
             }
 
-            auto* pm = camera->get<ProjectionMatrixComponent<CameryHandleType>>();
+            auto* pm = camera->get<ProjectionMatrixComponent<CameraHandleType>>();
             if (!pm) {
                 logger_.error("Expected ProjectionMatrixComponent, but couldn't find any.");
                 return std::nullopt;
