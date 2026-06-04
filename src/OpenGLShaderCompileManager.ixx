@@ -236,8 +236,8 @@ export namespace helios::opengl {
                     logger_.error("Could not compile shader");
                 } else {
                     shaderEntity->template remove<ShaderSourceComponent<THandle>>();
-                    uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), renderResourceWorld_, updateContext);
-                    uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), renderResourceWorld_, updateContext);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), renderResourceWorld_, updateContext);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), renderResourceWorld_, updateContext);
                 }
             }
 
