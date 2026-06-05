@@ -22,6 +22,6 @@ export namespace helios::opengl::components {
      * @tparam THandle Owning entity handle type.
      */
     template<typename THandle>
-    using OpenGLRenderTargetIdComponent = NumericValueComponent<OpenGLRenderTargetIdDomain, THandle, uint32_t>;
+    using OpenGLRenderTargetIdComponent = NumericValueComponent<OpenGLRenderTargetIdDomain, uint32_t, THandle>;
 
 }
