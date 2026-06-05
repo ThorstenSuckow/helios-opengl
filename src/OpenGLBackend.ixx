@@ -339,7 +339,7 @@ export namespace helios::opengl {
                 passUniformValueBag_.set<ViewMatrixUniform>(vp->viewMatrix);
             }
 
-            auto viewportBounds  = viewport->get<BoundsComponent<ViewportHandle>>()->value();
+            auto viewportBounds  = viewport->get<RectComponent<ViewportHandle>>()->value();
             auto renderTargetSize = renderTargetEntity->get<Size2DComponent<RenderTargetHandle>>()->value();
 
             const auto x = static_cast<int>(renderTargetSize[0] * viewportBounds[0]);
