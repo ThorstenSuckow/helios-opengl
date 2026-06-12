@@ -37,6 +37,11 @@ export namespace helios::opengl::components {
         unsigned int ebo;
 
         /**
+         * @brief Instance Buffer Object handle, if any. Will be 0 if no instancing is cosnidered.
+         */
+        unsigned int instanceVbo;
+
+        /**
          * @brief Number of indices used for indexed draw calls.
          */
         std::size_t indexCount;
