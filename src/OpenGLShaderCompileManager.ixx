@@ -57,30 +57,52 @@ export namespace helios::opengl {
      * @brief Manager that consumes shader compile commands and performs OpenGL compilation/linking.
      *
      * @tparam THandle Shader handle type.
-     * @tparam TCommandBuffer Command buffer type for optional follow-up commands.
+     * @tparam TUniformCacheStrategy Uniform cache strategy used after successful program linking.
      */
     template<typename THandle, typename TUniformCacheStrategy = NullUniformCacheStrategy<THandle>>
     requires IsShaderHandle<THandle> && IsUniformCacheStrategyLike<TUniformCacheStrategy, THandle, UniformScope::Pass, UniformScope::Draw>
     class OpenGLShaderCompileManager {
 
+        /**
+         * @brief File reader used to load shader source text from disk.
+         */
         BasicStringFileReader stringFileReader_;
 
+        /**
+         * @brief Render-resource world used to resolve shader entities by handle.
+         */
         RenderResourceWorld& renderResourceWorld_;
 
+        /**
+         * @brief Pending shader handles queued for compilation during `flush(...)`.
+         */
         std::vector<ShaderHandle> shaderHandles_;
 
+        /**
+         * @brief Reused storage for loaded vertex shader source.
+         */
         std::string vertexShaderSource_;
 
+        /**
+         * @brief Reused storage for loaded fragment shader source.
+         */
         std::string fragmentShaderSource_;
 
 
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
 
+        /**
+         * @brief Uniform caching strategy executed after successful shader compilation.
+         */
         TUniformCacheStrategy uniformCacheStrategy_;
 
         /**
          * @brief Loads the specified vertex and fragment shader.
          *
+         * @param vertexShaderPath Path to the vertex shader source file.
+         * @param fragmentShaderPath Path to the fragment shader source file.
+         * @param vertexShaderSource Output buffer receiving vertex shader source text.
+         * @param fragmentShaderSource Output buffer receiving fragment shader source text.
          * @return true if loading succeeded, otherwise false.
          *
          * @throws if loading the specified files failed.
@@ -104,6 +126,7 @@ export namespace helios::opengl {
         /**
          * @brief Compiles the vertex and fragment shader represented by this instance.
          *
+         * @param shader Shader entity providing source and receiving OpenGL shader state.
          * @return true if compilation succeeded, otherwise false.
          *
          * @throws if compilation failed.
@@ -196,6 +219,7 @@ export namespace helios::opengl {
          * @brief Constructs the manager with access to render-resource world storage.
          *
          * @param renderResourceWorld Render-resource world used to resolve shader entities.
+         * @param uniformCacheStrategy Strategy object used to cache pass/draw uniforms.
          */
         explicit OpenGLShaderCompileManager(
             RenderResourceWorld& renderResourceWorld,
@@ -244,15 +268,29 @@ export namespace helios::opengl {
             shaderHandles_.clear();
         }
 
-        bool submit(const ShaderBatchCompileCommand<THandle>& command)  noexcept {
-            for (const auto& shaderHandle : command.shaderHandles) {
-                shaderHandles_.push_back(shaderHandle);
+        /**
+         * @brief Enqueues a batch of shader handles for compilation.
+         *
+         * @param command Compile command that is consumed by move.
+         * @return `true` if the command was accepted.
+         */
+        bool submit(ShaderBatchCompileCommand<THandle>&& command)  noexcept {
+            shaderHandles_.reserve(shaderHandles_.size() + command.shaderHandles.size());
+
+            for (auto& shaderHandle : command.shaderHandles) {
+                shaderHandles_.push_back(std::move(shaderHandle));
             }
             return true;
         }
 
-        bool submit(const ShaderCompileCommand<THandle>& command)  noexcept {
-            shaderHandles_.push_back(command.shaderHandle);
+        /**
+         * @brief Enqueues a single shader handle for compilation.
+         *
+         * @param command Compile command that is consumed by move.
+         * @return `true` if the command was accepted.
+         */
+        bool submit(ShaderCompileCommand<THandle>&& command)  noexcept {
+            shaderHandles_.push_back(std::move(command.shaderHandle));
             return true;
         }
 
