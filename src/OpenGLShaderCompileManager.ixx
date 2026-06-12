@@ -89,6 +89,9 @@ export namespace helios::opengl {
         std::string fragmentShaderSource_;
 
 
+        /**
+         * @brief Scoped logger for shader compile and link diagnostics.
+         */
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
 
         /**
@@ -105,7 +108,7 @@ export namespace helios::opengl {
          * @param fragmentShaderSource Output buffer receiving fragment shader source text.
          * @return true if loading succeeded, otherwise false.
          *
-         * @throws if loading the specified files failed.
+         * @note On failure, diagnostics are asserted/logged and `false` is returned.
          */
         bool load(
             const std::string& vertexShaderPath,
@@ -129,7 +132,7 @@ export namespace helios::opengl {
          * @param shader Shader entity providing source and receiving OpenGL shader state.
          * @return true if compilation succeeded, otherwise false.
          *
-         * @throws if compilation failed.
+         * @note On compile/link errors, diagnostics are asserted/logged and `false` is returned.
          */
         bool compile(ShaderEntity shader) noexcept {
 
@@ -239,6 +242,9 @@ export namespace helios::opengl {
         /**
          * @brief Compiles all queued shaders and clears processed command data.
          *
+         * @details Handles are queued through consuming `submit(...)` overloads and
+         * processed in FIFO order for the current frame.
+         *
          * @param updateContext Frame-local update context.
          */
         void flush(UpdateContext& updateContext)  noexcept {
@@ -295,7 +301,7 @@ export namespace helios::opengl {
         }
 
         /**
-         * @brief Registers compile command handlers in the runtime world.
+         * @brief Registers compile command handlers in the command registry.
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
