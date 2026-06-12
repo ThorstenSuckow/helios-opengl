@@ -91,9 +91,9 @@ export namespace helios::opengl {
                     GLint location = glGetUniformLocation(programId, umc->mappings[i].c_str());
                     if (location != -1) {
                         ulc.operations.emplace_back(static_cast<UniformSemantics>(i),  location);
-                        logger_.warn("Assigning uniform to plan: {0} to {1}", umc->mappings[i], location);
+                        logger_.debug("Assigning uniform to plan: {0} to {1}", umc->mappings[i], location);
                     } else {
-                        logger_.warn("Assigning uniform to plan failed. Expected uniform for {0}, but found nothing", umc->mappings[i]);
+                        logger_.error("Assigning uniform to plan failed. Expected uniform for {0}, but found nothing", umc->mappings[i]);
                     }
 
                 }
