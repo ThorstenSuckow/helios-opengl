@@ -43,14 +43,17 @@ export namespace helios::opengl::OpenGLEnumMapper {
     }
 
     /**
-     * @brief Converts an engine vertex attribute scalar type to OpenGL.
+     * @brief Converts an engine attribute type to OpenGL.
      *
-     * @param attributeType Engine vertex attribute type.
+     * @param attributeType Engine attribute type.
      * @return Matching OpenGL attribute type enum.
      */
-    [[nodiscard]] GLenum toOpenGL(const VertexAttributeType attributeType) noexcept {
+    [[nodiscard]] GLenum toOpenGLBaseType(const VertexAttributeType attributeType) noexcept {
         switch (attributeType) {
             case VertexAttributeType::Float:
+            case VertexAttributeType::Vec3f:
+            case VertexAttributeType::Vec4f:
+            case VertexAttributeType::Mat4f:
                 return GL_FLOAT;
             default:
                 std::unreachable();
