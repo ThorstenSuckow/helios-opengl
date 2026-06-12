@@ -61,6 +61,7 @@ using namespace helios::engine::spatial::components;
 using namespace helios::engine::rendering::material::types;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::engine::rendering::common::components;
+using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::mesh::types;
 using namespace helios::engine::rendering::renderTarget;
 using namespace helios::engine::rendering::renderTarget::types;
@@ -84,12 +85,14 @@ export namespace helios::opengl {
     class OpenGLBackend {
     private:
 
-
         /**
          * @brief Tracks whether GL function pointers were initialized.
          */
         bool isInitialized_ = false;
 
+        /**
+         * @brief Scoped logger used for backend diagnostics.
+         */
         inline static const helios::engine::util::log::Logger& logger_ = helios::engine::util::log::LogManager::loggerForScope(
             HELIOS_LOG_SCOPE
         );
@@ -108,6 +111,7 @@ export namespace helios::opengl {
          * @brief Cached draw-scope uniforms (for example model matrix/material color).
          */
         UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
+
 
         /**
          * @brief Currently active render target for nested viewport processing.
@@ -136,8 +140,7 @@ export namespace helios::opengl {
         /**
          * @brief Resolves view and projection matrices for a viewport's bound camera.
          *
-         * @param updateContext Current frame update context.
-         * @param viewportHandle Viewport to resolve camera matrices for.
+         * @param vieportEntity Viewport entity used to resolve camera bindings.
          * @return View/projection pair on success, otherwise `std::nullopt`.
          */
         [[nodiscard]] std::optional<ViewProjection> viewProjection(const ViewportEntity& vieportEntity) const noexcept {
@@ -189,8 +192,8 @@ export namespace helios::opengl {
             auto* ulc = shaderEntity.get<OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>>();
 
             if (!ulc) {
-                logger_.error("OpenGLUniformWritePlanComponent<{0}> expected, but not found", typeid(TUniformScope).name());
-                assert(false && "OpenGLUniformWritePlanComponent not found");
+                logger_.error("OpenGLUniformWriteOperationsComponent<{0}> expected, but not found", typeid(TUniformScope).name());
+                assert(false && "OpenGLUniformWriteOperationsComponent not found");
                 return;
             }
 
@@ -199,12 +202,11 @@ export namespace helios::opengl {
 
 
         /**
-         * @brief ClearColor/Mask based on available components.
+         * @brief Applies clear color and clear mask based on optional components.
          *
-         * @tparam THandle
-         * @tparam TEntity
-         *
-         * @param entity
+         * @tparam THandle Handle type used for component lookup.
+         * @tparam TEntity Entity wrapper type exposing `get<...>()`.
+         * @param entity Entity to query for `ColorComponent` and `ClearComponent`.
          */
         template<typename THandle, typename TEntity>
         void clearColor(TEntity& entity) noexcept {
@@ -239,7 +241,7 @@ export namespace helios::opengl {
          *
          * @param engineWorld Engine world providing render resources and targets.
          */
-        explicit OpenGLBackend(EngineWorld& engineWorld) : engineWorld_(engineWorld){}
+        explicit OpenGLBackend(EngineWorld& engineWorld) : engineWorld_(engineWorld) {}
 
 
         /**
@@ -302,7 +304,6 @@ export namespace helios::opengl {
 
             currentRenderTargetHandle_ = RenderTargetHandle{};
             passUniformValueBag_.clearValues();
-            drawUniformValueBag_.clearValues();
         }
 
         /**
@@ -470,17 +471,25 @@ export namespace helios::opengl {
             glBindVertexArray(0);
         }
 
+
         /**
-         * @brief Renders all draw contexts of the current mesh batch.
+         * @brief Renders an instanced batch and individual draw contexts.
          *
-         * @details Writes draw-scope uniforms per context and submits one indexed
-         * `glDrawElements` call per entry.
+         * @details
+         * - If `instanceData` is non-empty, uploads instance payload to the active instance VBO
+         *   and issues one `glDrawElementsInstanced` call.
+         * - Iterates `sceneMemberRenderContexts`, updates draw-scope uniforms per
+         *   context, and issues one indexed draw call per member.
          *
-         * @tparam THandle Scene member handle type.
-         * @param sceneMemberRenderContexts Draw contexts belonging to the active mesh batch.
+         * @tparam THandle Scene member handle type contained in render contexts.
+         * @param sceneMemberRenderContexts Non-instanced draw contexts.
+         * @param instanceData Optional per-instance payload for instanced rendering.
          */
         template<typename THandle>
-        void renderBatch(std::span<SceneMemberRenderContext<THandle>> sceneMemberRenderContexts) noexcept {
+        void renderBatch(
+            std::span<const SceneMemberRenderContext<THandle>> sceneMemberRenderContexts,
+            std::span<const InstanceData> instanceData
+            ) noexcept {
 
             if (!currentOpenGLMesh_) {
                 logger_.error("OpenGLMesh expected, but not available");
@@ -491,10 +500,43 @@ export namespace helios::opengl {
                 return;
             }
 
-            auto shaderEntity = engineWorld_.find(currentShaderHandle_);
+            const auto shaderEntity = engineWorld_.find(currentShaderHandle_);
 
             assert(shaderEntity && "ShaderEntity expected, but not found");
             assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
+
+            const auto instanceSize = instanceData.size();
+
+            assert(instanceSize <= 1000000 && "Instance data size seems unreasonably large.");
+
+            if (instanceSize > 0) {
+
+                /**
+                 * @todo move to own material scope (colors)
+                 */
+                writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
+
+                assert(currentOpenGLMesh_->instanceVbo && "Using instancing without configured instanceVbo");
+                glBindBuffer(GL_ARRAY_BUFFER, currentOpenGLMesh_->instanceVbo);
+
+                glBufferData(
+                    GL_ARRAY_BUFFER,
+                    instanceSize * sizeof(InstanceData),
+                    instanceData.data(),
+                    GL_DYNAMIC_DRAW);
+
+
+                glDrawElementsInstanced(
+                    currentOpenGLMesh_->primitiveType,
+                    currentOpenGLMesh_->indexCount,
+                    GL_UNSIGNED_INT,
+                    nullptr,
+                    instanceSize
+                );
+
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+            }
 
             for (auto& renderContext : sceneMemberRenderContexts) {
 
@@ -506,8 +548,9 @@ export namespace helios::opengl {
                     GL_UNSIGNED_INT,
                     nullptr
                 );
-
             }
+
+            drawUniformValueBag_.clearValues();
         }
 
         /**
