@@ -62,19 +62,97 @@ export namespace helios::opengl {
      * @brief Manager that consumes mesh-upload commands and performs OpenGL buffer setup.
      *
      * @tparam THandle Mesh handle type.
-     * @tparam TCommandBuffer Command buffer type for optional follow-up commands.
+     * @tparam TCommandBuffer Command buffer type (kept for compatibility with runtime wiring).
      */
     template<typename THandle, typename TCommandBuffer = NullCommandBuffer>
     requires IsMeshHandle<THandle> && IsCommandBufferLike<TCommandBuffer>
     class OpenGLMeshUploadManager {
 
+        /**
+         * @brief Render-resource world used to resolve mesh entities by handle.
+         */
         RenderResourceWorld& renderResourceWorld_;
 
+        /**
+         * @brief Pending mesh handles queued for upload during `flush(...)`.
+         */
         std::vector<MeshHandle> meshHandles_;
 
 
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
-        
+
+        /**
+         * @brief Derived OpenGL attribute layout information for one engine attribute type.
+         */
+        struct AttributeFormat {
+            std::uint32_t locationCount;
+            std::uint32_t componentsPerLocation;
+            std::uint32_t locationStrideBytes;
+        };
+
+        /**
+         * @brief Configures OpenGL vertex attribute pointers from one layout component.
+         *
+         * @tparam TVertexInputRate Input-rate tag (`PerVertex` or `PerInstance`).
+         * @param layoutComponent Attribute layout component to translate to OpenGL calls.
+         */
+        template<typename TVertexInputRate>
+        void buildVertexAttributeLayout(const VertexAttributeLayoutComponent<THandle, TVertexInputRate>* layoutComponent) noexcept {
+
+            const auto& active = layoutComponent->active();
+            const auto& layouts = layoutComponent->layouts();
+
+            for (std::size_t idx = 0; idx < active.size(); idx++) {
+
+                if (!active.test(idx)) {
+                    continue;
+                }
+
+                const auto& layout = layouts[idx];
+
+                const auto format = fromAttributeType(layout.attribute.type);
+
+                for (std::uint32_t i = 0; i < format.locationCount; i++) {
+                    const auto location = layout.location + i;
+
+                    glEnableVertexAttribArray(location);
+                    glVertexAttribPointer(
+                        location,
+                        format.componentsPerLocation,
+                        OpenGLEnumMapper::toOpenGLBaseType(layout.attribute.type),
+                        GL_FALSE,
+                        static_cast<GLsizei>(layout.stride),
+                        reinterpret_cast<void*>(layout.offset + (i * format.locationStrideBytes))
+                    );
+                    glVertexAttribDivisor(location, layout.divisor);
+                }
+            }
+
+        }
+
+
+        /**
+         * @brief Maps engine attribute type to OpenGL attribute format details.
+         *
+         * @param attributeType Engine-side vertex attribute type.
+         * @return Expanded format used to configure one or multiple attribute locations.
+         */
+        [[nodiscard]] AttributeFormat fromAttributeType(VertexAttributeType attributeType) const noexcept {
+
+            switch (attributeType) {
+                case VertexAttributeType::Float:
+                    return AttributeFormat{1, 1, 0};
+                case VertexAttributeType::Vec3f:
+                    return AttributeFormat{1, 3, 0};
+                case VertexAttributeType::Vec4f:
+                    return AttributeFormat{1, 4, 0};
+                case VertexAttributeType::Mat4f:
+                    return AttributeFormat{4, 4, sizeof(float) * 4};
+                default:
+                    std::unreachable();
+            }
+
+        }
 
         /**
          * @brief Uploads one mesh to GPU buffers and configures vertex attributes.
@@ -109,13 +187,22 @@ export namespace helios::opengl {
             openglMesh.indexCount    = meshData.indices.size();
             openglMesh.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
+            auto* vertexAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<Handle, PerVertex>>();
+            assert(vertexAttributeLayoutComponent && "Expected a VertexAttributeLayoutComponent for PerVertex attributes");
+            auto* instancedAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<Handle, PerInstance>>();
+
             glGenVertexArrays(1, &openglMesh.vao);
             glGenBuffers(1, &openglMesh.vbo);
             glGenBuffers(1, &openglMesh.ebo);
 
-            glBindVertexArray(openglMesh.vao);
-            glBindBuffer(GL_ARRAY_BUFFER, openglMesh.vbo);
+            if (instancedAttributeLayoutComponent) {
+                glGenBuffers(1, &openglMesh.instanceVbo);
+            }
 
+            glBindVertexArray(openglMesh.vao);
+
+            // vertex buffer
+            glBindBuffer(GL_ARRAY_BUFFER, openglMesh.vbo);
             glBufferData(
                 GL_ARRAY_BUFFER,
                 meshData.vertices.size() * sizeof(Vertex),
@@ -123,6 +210,7 @@ export namespace helios::opengl {
                 GL_STATIC_DRAW
             );
 
+            // element buffer
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, openglMesh.ebo);
             glBufferData(
                 GL_ELEMENT_ARRAY_BUFFER,
@@ -131,32 +219,29 @@ export namespace helios::opengl {
                 GL_STATIC_DRAW
             );
 
-            // vertex position
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(
-                0, 3, GL_FLOAT,
-                GL_FALSE, sizeof(Vertex), nullptr
-            );
+            // per instance buffer
+            buildVertexAttributeLayout<PerVertex>(vertexAttributeLayoutComponent);
+            mesh.template remove<VertexAttributeLayoutComponent<Handle, PerVertex>>();
 
-            // vertex normals
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                reinterpret_cast<void*>(offsetof(Vertex, normal))
-            );
+            if (instancedAttributeLayoutComponent) {
+                glBindBuffer(GL_ARRAY_BUFFER, openglMesh.instanceVbo);
+                buildVertexAttributeLayout<PerInstance>(instancedAttributeLayoutComponent);
+                mesh.template remove<VertexAttributeLayoutComponent<Handle, PerInstance>>();
+            }
 
-            // vertex texture coords
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                reinterpret_cast<void*>(offsetof(Vertex, texCoords))
-            );
 
             glBindVertexArray(0);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
             return true;
         }
 
         public:
 
-
+        /**
+         * @brief Constructs the manager with access to render-resource storage.
+         *
+         * @param renderResourceWorld Render-resource world used to resolve mesh entities.
+         */
         explicit OpenGLMeshUploadManager(RenderResourceWorld& renderResourceWorld)
         :
         renderResourceWorld_(renderResourceWorld)
@@ -201,12 +286,14 @@ export namespace helios::opengl {
         /**
          * @brief Queues mesh handles from a batch upload command.
          *
-         * @param command Batch command containing mesh handles to upload.
+         * @param command Batch command containing mesh handles to upload (consumed by value).
          * @return `true` when the command was accepted.
          */
-        bool submit(const MeshBatchUploadCommand<THandle>& command)  noexcept {
+        bool submit(MeshBatchUploadCommand<THandle> command)  noexcept {
+            meshHandles_.reserve(meshHandles_.size() + command.meshHandles.size());
+
             for (const auto& meshHandle : command.meshHandles) {
-                meshHandles_.push_back(meshHandle);
+                meshHandles_.push_back(std::move(meshHandle));
             }
             return true;
         }
