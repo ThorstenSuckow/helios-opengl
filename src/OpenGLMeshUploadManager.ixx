@@ -289,7 +289,7 @@ export namespace helios::opengl {
          * @param command Batch command containing mesh handles to upload (consumed by value).
          * @return `true` when the command was accepted.
          */
-        bool submit(MeshBatchUploadCommand<THandle> command)  noexcept {
+        bool submit(MeshBatchUploadCommand<THandle>&& command)  noexcept {
             meshHandles_.reserve(meshHandles_.size() + command.meshHandles.size());
 
             for (const auto& meshHandle : command.meshHandles) {
