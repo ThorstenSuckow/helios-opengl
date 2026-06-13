@@ -144,12 +144,12 @@ export namespace helios::opengl {
         /**
          * @brief Resolves view and projection matrices for a viewport's bound camera.
          *
-         * @param vieportEntity Viewport entity used to resolve camera bindings.
+         * @param viewportEntity Viewport entity used to resolve camera bindings.
          * @return View/projection pair on success, otherwise `std::nullopt`.
          */
-        [[nodiscard]] std::optional<ViewProjection> viewProjection(const ViewportEntity& vieportEntity) const noexcept {
+        [[nodiscard]] std::optional<ViewProjection> viewProjection(const ViewportEntity& viewportEntity) const noexcept {
 
-            auto* cbc = vieportEntity.get<CameraBindingComponent<ViewportHandle>>();
+            auto* cbc = viewportEntity.get<CameraBindingComponent<ViewportHandle>>();
             if (!cbc) {
                 logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
                 return std::nullopt;
