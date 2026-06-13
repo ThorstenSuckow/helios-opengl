@@ -108,10 +108,14 @@ export namespace helios::opengl {
         UniformValueBag<UniformScope::Pass> passUniformValueBag_{};
 
         /**
-         * @brief Cached draw-scope uniforms (for example model matrix/material color).
+         * @brief Cached draw-scope uniforms (for example model matrix).
          */
         UniformValueBag<UniformScope::Draw> drawUniformValueBag_{};
 
+        /**
+         * @brief Cached material-scope uniforms (for example material color).
+         */
+        UniformValueBag<UniformScope::Material> materialUniformValueBag_{};
 
         /**
          * @brief Currently active render target for nested viewport processing.
@@ -420,7 +424,10 @@ export namespace helios::opengl {
 
             auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
             if (colorComponent) {
-                drawUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
+                materialUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
+                const auto shaderEntity = engineWorld_.find(currentShaderHandle_);
+                assert(shaderEntity && "ShaderEntity expected, but not found");
+                writeUniformValues<UniformScope::Material>(*shaderEntity, materialUniformValueBag_);
             }
 
         }
@@ -431,7 +438,7 @@ export namespace helios::opengl {
          * @param handle Material handle for this batch.
          */
         void endMaterialBatch(MaterialHandle handle) noexcept {
-            // intentionally left empty
+            materialUniformValueBag_.clearValues();
         }
 
         /**
@@ -511,10 +518,6 @@ export namespace helios::opengl {
 
             if (instanceSize > 0) {
 
-                /**
-                 * @todo move to own material scope (colors)
-                 */
-                writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
 
                 assert(currentOpenGLMesh_->instanceVbo && "Using instancing without configured instanceVbo");
                 glBindBuffer(GL_ARRAY_BUFFER, currentOpenGLMesh_->instanceVbo);

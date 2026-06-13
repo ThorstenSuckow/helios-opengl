@@ -60,7 +60,10 @@ export namespace helios::opengl {
      * @tparam TUniformCacheStrategy Uniform cache strategy used after successful program linking.
      */
     template<typename THandle, typename TUniformCacheStrategy = NullUniformCacheStrategy<THandle>>
-    requires IsShaderHandle<THandle> && IsUniformCacheStrategyLike<TUniformCacheStrategy, THandle, UniformScope::Pass, UniformScope::Draw>
+    requires IsShaderHandle<THandle> &&
+        IsUniformCacheStrategyLike<
+            TUniformCacheStrategy, THandle, UniformScope::Pass, UniformScope::Material, UniformScope::Draw
+        >
     class OpenGLShaderCompileManager {
 
         /**
@@ -267,7 +270,9 @@ export namespace helios::opengl {
                 } else {
                     shaderEntity->template remove<ShaderSourceComponent<THandle>>();
                     std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), renderResourceWorld_, updateContext);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), renderResourceWorld_, updateContext);
                     std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), renderResourceWorld_, updateContext);
+
                 }
             }
 
