@@ -10,11 +10,12 @@ uniform-location caching, and typed uniform writes.
 
 ## Features
 
-- OpenGL render backend for render-target and viewport execution
-- Shader compilation/linking manager for engine shader resources
-- Mesh upload manager for VAO/VBO/EBO creation
+- OpenGL render backend for render-target and viewport execution (instanced and non-instanced draw paths)
+- Shader compilation/linking manager for engine shader resources with consuming command submission
+- Mesh upload manager for VAO/VBO/EBO creation with per-vertex and per-instance layouts
 - Uniform-location caching strategy
 - Typed uniform writer for view, projection, model, and material uniforms
+- Vertex attribute mapping for `Float`, `Vec3f`, `Vec4f`, and `Mat4f`
 - OpenGL-specific ECS components for shader, mesh, uniform, and render-target data
 
 ## Module surface
