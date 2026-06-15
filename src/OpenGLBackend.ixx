@@ -480,23 +480,16 @@ export namespace helios::opengl {
 
 
         /**
-         * @brief Renders an instanced batch and individual draw contexts.
+         * @brief Renders non-instanced draw contexts.
          *
-         * @details
-         * - If `instanceData` is non-empty, uploads instance payload to the active instance VBO
-         *   and issues one `glDrawElementsInstanced` call.
-         * - Iterates `sceneMemberRenderContexts`, updates draw-scope uniforms per
-         *   context, and issues one indexed draw call per member.
+         * @details Iterates `sceneMemberRenderContexts`, updates draw-scope
+         * uniforms per context, and issues one indexed draw call per member.
          *
          * @tparam THandle Scene member handle type contained in render contexts.
          * @param sceneMemberRenderContexts Non-instanced draw contexts.
-         * @param instanceData Optional per-instance payload for instanced rendering.
          */
         template<typename THandle>
-        void renderBatch(
-            std::span<const SceneMemberRenderContext<THandle>> sceneMemberRenderContexts,
-            std::span<const InstanceData> instanceData
-            ) noexcept {
+        void renderBatch(std::span<const SceneMemberRenderContext<THandle>> sceneMemberRenderContexts) noexcept {
 
             if (!currentOpenGLMesh_) {
                 logger_.error("OpenGLMesh expected, but not available");
@@ -512,35 +505,6 @@ export namespace helios::opengl {
             assert(shaderEntity && "ShaderEntity expected, but not found");
             assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
 
-            const auto instanceSize = instanceData.size();
-
-            assert(instanceSize <= 1000000 && "Instance data size seems unreasonably large.");
-
-            if (instanceSize > 0) {
-
-
-                assert(currentOpenGLMesh_->instanceVbo && "Using instancing without configured instanceVbo");
-                glBindBuffer(GL_ARRAY_BUFFER, currentOpenGLMesh_->instanceVbo);
-
-                glBufferData(
-                    GL_ARRAY_BUFFER,
-                    instanceSize * sizeof(InstanceData),
-                    instanceData.data(),
-                    GL_DYNAMIC_DRAW);
-
-
-                glDrawElementsInstanced(
-                    currentOpenGLMesh_->primitiveType,
-                    currentOpenGLMesh_->indexCount,
-                    GL_UNSIGNED_INT,
-                    nullptr,
-                    instanceSize
-                );
-
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-            }
-
             for (auto& renderContext : sceneMemberRenderContexts) {
 
                 drawUniformValueBag_.set<ModelMatrixUniform>(renderContext.worldMatrix);
@@ -554,6 +518,54 @@ export namespace helios::opengl {
             }
 
             drawUniformValueBag_.clearValues();
+        }
+
+        /**
+         * @brief Renders one instanced draw call for the provided instance payload.
+         *
+         * @details Uploads `instanceData` to the active instance VBO and submits
+         * one `glDrawElementsInstanced` call. Returns early when the input span is empty.
+         *
+         * @tparam THandle Scene member handle type used by `InstanceData`.
+         * @param instanceData Per-instance payload for instanced rendering.
+         */
+        template<typename THandle>
+        void renderBatch(std::span<const InstanceData<THandle>> instanceData) noexcept {
+
+            if (!currentOpenGLMesh_) {
+                logger_.error("OpenGLMesh expected, but not available");
+                return;
+            }
+
+            assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
+
+            const auto instanceSize = instanceData.size();
+
+            assert(instanceSize <= 1000000 && "Instance data size seems unreasonably large.");
+
+            if (instanceSize <= 0) {
+                return;
+            }
+
+            assert(currentOpenGLMesh_->instanceVbo && "Using instancing without configured instanceVbo");
+            glBindBuffer(GL_ARRAY_BUFFER, currentOpenGLMesh_->instanceVbo);
+
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                instanceSize * sizeof(InstanceData<THandle>),
+                instanceData.data(),
+                GL_DYNAMIC_DRAW);
+
+
+            glDrawElementsInstanced(
+                currentOpenGLMesh_->primitiveType,
+                currentOpenGLMesh_->indexCount,
+                GL_UNSIGNED_INT,
+                nullptr,
+                instanceSize
+            );
+
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
 
         /**
