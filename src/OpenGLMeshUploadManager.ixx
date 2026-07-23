@@ -302,10 +302,14 @@ export namespace helios::opengl {
          * @brief Registers mesh upload command handlers in the command registry.
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
+         * @param managerRegistry
          */
-        void init(helios::engine::runtime::messaging::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
+        void init(
+            helios::engine::runtime::messaging::command::CommandHandlerRegistry& commandHandlerRegistry
+            ) noexcept {
             commandHandlerRegistry.registerHandler<MeshBatchUploadCommand<THandle>>(*this);
         }
+
     };
 
 
