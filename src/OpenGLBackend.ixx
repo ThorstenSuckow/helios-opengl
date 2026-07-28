@@ -488,8 +488,7 @@ export namespace helios::opengl {
          * @tparam THandle Scene member handle type contained in render contexts.
          * @param sceneMemberRenderContexts Non-instanced draw contexts.
          */
-        template<typename THandle>
-        void renderBatch(std::span<const SceneMemberRenderContext<THandle>> sceneMemberRenderContexts) noexcept {
+        void renderBatch(const std::span<const DrawContext> sceneMemberRenderContexts) noexcept {
 
             if (!currentOpenGLMesh_) {
                 logger_.error("OpenGLMesh expected, but not available");
@@ -529,8 +528,7 @@ export namespace helios::opengl {
          * @tparam THandle Scene member handle type used by `InstanceData`.
          * @param instanceData Per-instance payload for instanced rendering.
          */
-        template<typename THandle>
-        void renderBatch(std::span<const InstanceData<THandle>> instanceData) noexcept {
+        void renderBatch(const std::span<const InstanceData> instanceData) const noexcept {
 
             if (!currentOpenGLMesh_) {
                 logger_.error("OpenGLMesh expected, but not available");
@@ -552,7 +550,7 @@ export namespace helios::opengl {
 
             glBufferData(
                 GL_ARRAY_BUFFER,
-                instanceSize * sizeof(InstanceData<THandle>),
+                static_cast<GLsizeiptr>(instanceSize * sizeof(InstanceData)),
                 instanceData.data(),
                 GL_DYNAMIC_DRAW);
 
