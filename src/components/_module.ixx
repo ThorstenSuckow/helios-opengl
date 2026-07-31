@@ -6,6 +6,7 @@ export module helios.opengl.components;
 
 export import helios.opengl.components.OpenGLShaderComponent;
 export import helios.opengl.components.OpenGLMeshComponent;
+export import helios.opengl.components.OpenGLTextureComponent;
 export import helios.opengl.components.OpenGLRenderTargetIdComponent;
 export import helios.opengl.components.OpenGLUniformLocationComponent;
 export import helios.opengl.components.OpenGLUniformWriteOperationsComponent;
