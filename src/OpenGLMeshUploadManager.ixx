@@ -142,6 +142,8 @@ export namespace helios::opengl {
             switch (attributeType) {
                 case VertexAttributeType::Float:
                     return AttributeFormat{1, 1, 0};
+                case VertexAttributeType::Vec2f:
+                    return AttributeFormat{1, 2, 0};
                 case VertexAttributeType::Vec3f:
                     return AttributeFormat{1, 3, 0};
                 case VertexAttributeType::Vec4f:

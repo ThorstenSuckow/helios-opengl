@@ -51,6 +51,7 @@ export namespace helios::opengl::OpenGLEnumMapper {
     [[nodiscard]] GLenum toOpenGLBaseType(const VertexAttributeType attributeType) noexcept {
         switch (attributeType) {
             case VertexAttributeType::Float:
+            case VertexAttributeType::Vec2f:
             case VertexAttributeType::Vec3f:
             case VertexAttributeType::Vec4f:
             case VertexAttributeType::Mat4f:
