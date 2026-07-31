@@ -38,6 +38,7 @@ import helios.opengl.types;
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
 import helios.engine.rendering.material;
+import helios.engine.rendering.texture;
 import helios.engine.rendering.renderTarget;
 import helios.engine.rendering.viewport;
 import helios.engine.util.Colors;
@@ -59,6 +60,8 @@ using namespace helios::opengl::components;
 using namespace helios::opengl::types;
 using namespace helios::engine::spatial::components;
 using namespace helios::engine::rendering::material::types;
+using namespace helios::engine::rendering::texture::types;
+using namespace helios::engine::rendering::texture::components;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::engine::rendering::common::components;
 using namespace helios::engine::rendering::shader::components;
@@ -405,6 +408,49 @@ export namespace helios::opengl {
          */
         void endShaderBatch(ShaderHandle handle) noexcept {
             currentShaderHandle_ = ShaderHandle{};
+        }
+
+        /**
+         * @brief Begins processing for one texture batch.
+         *
+         * @param textureHandle Texture handle for this batch.
+         */
+        void beginTextureBatch(TextureHandle textureHandle) noexcept {
+
+            /**
+             * @todo this might be the case if no texture at all was specified
+             * eventually replace this with an explicitly NULL-type handle
+             */
+            if (!textureHandle.isValid()) {
+                return;
+            }
+
+            auto textureEntity = engineWorld_.find(textureHandle);
+
+            if (!textureEntity) {
+                logger_.error("TextureEntity expected, but not found");
+                assert(false && "TextureEntity not found");
+                return;
+            }
+
+            auto* textureComponent = textureEntity->template get<OpenGLTextureComponent<TextureHandle>>();
+
+            if (!textureComponent) {
+                logger_.error("OpenGLTexture expected, but not found");
+                assert(false && "OpenGLTexture not found");
+                return;
+            }
+
+            glBindTexture(GL_TEXTURE_2D, textureComponent->textureId);
+        }
+
+        /**
+         * @brief Ends the texture batch und unbinds the current texture.
+         *
+         * @param handle Texture handle for this batch.
+         */
+        void endTextureBatch(TextureHandle handle) noexcept {
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         /**
