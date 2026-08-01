@@ -112,10 +112,13 @@ export namespace helios::opengl {
             glGenTextures(1, &textureId);
             glBindTexture(GL_TEXTURE_2D, textureId);
 
+            /**
+             * @todo when bound, this can be changed during runtime, i.e. move to render backend
+             */
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
             if (imageData.nrChannels != 4) {
                 assert(false && "Expected 4 channels (RGBA) in texture data");
