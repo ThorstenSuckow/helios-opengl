@@ -81,7 +81,7 @@ export namespace helios::opengl {
         bool upload(texture::TextureEntity texture) noexcept requires std::same_as<THandle, typename texture::TextureEntity::Handle_type> {
 
 
-            logger_.info("Uploading texture data for MeshEntity {0}...", texture.handle().entityId);
+            logger_.info("Uploading texture data for MeshEntity {0}...", texture.handle().entityId());
 
 
             auto* textureSourceCmp = texture.template get<texture::components::TextureSourceComponent<THandle>>();
