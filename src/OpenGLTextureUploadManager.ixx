@@ -98,7 +98,14 @@ export namespace helios::opengl {
                 return false;
             }
 
-            const auto imageData = imageReader_.data(textureSourceCmp->texturePath);
+            ImageData imageData{};
+            logger_.info("Uploading {0}", textureSourceCmp->texturePath);
+            if (!imageReader_.readInto(textureSourceCmp->texturePath, imageData)) {
+                assert(false && "Texture upload failed");
+                logger_.error("Texture upload failed.");
+                return false;
+            }
+            logger_.info("... done uploading.");
 
             unsigned int textureId;
 
@@ -110,7 +117,11 @@ export namespace helios::opengl {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-            assert(imageData.nrChannels == 4 && "Expected 4 channels (RGBA) in texture data");
+            if (imageData.nrChannels != 4) {
+                assert(false && "Expected 4 channels (RGBA) in texture data");
+                logger_.error("Expected 4 channels (RGBA) in texture data");
+                return false;
+            }
 
             glTexImage2D(
                 GL_TEXTURE_2D, 0, GL_RGBA,
@@ -125,7 +136,7 @@ export namespace helios::opengl {
             return true;
         }
 
-        const ImageReader& imageReader_;
+        const ImageReader imageReader_;
 
         public:
 
@@ -167,6 +178,9 @@ export namespace helios::opengl {
                     continue;
                 }
 
+                /**
+                 * @todo fallback texture?
+                 */
                 if (!upload(*textureEntity)) {
                     logger_.error("Could not upload texture");
                     assert(false && "Could not upload texture");
