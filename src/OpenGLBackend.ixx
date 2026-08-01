@@ -265,7 +265,7 @@ export namespace helios::opengl {
 
             #ifdef HELIOS_DEBUG
             if (!renderTargetEntity) {
-                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetHandle.entityId);
+                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetHandle.entityId());
                 assert(renderTargetEntity && "Missing RenderTargetEntity for handle.");
             }
             #endif
@@ -328,11 +328,11 @@ export namespace helios::opengl {
 
             #ifdef HELIOS_DEBUG
             if (!renderTargetEntity) {
-                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetEntity->handle().entityId);
+                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetEntity->handle().entityId());
                 assert(renderTargetEntity && "Missing RenderTargetEntity for handle.");
             }
             if (!viewport) {
-                logger_.error("Missing Viewport for handle {0}.", viewportHandle.entityId);
+                logger_.error("Missing Viewport for handle {0}.", viewportHandle.entityId());
                 assert(viewport && "Missing Viewport for handle.");
             }
             #endif
@@ -417,13 +417,6 @@ export namespace helios::opengl {
          */
         void beginTextureBatch(TextureHandle textureHandle) noexcept {
 
-            /**
-             * @todo this might be the case if no texture at all was specified
-             * eventually replace this with an explicitly NULL-type handle
-             */
-            if (!textureHandle.isValid()) {
-                return;
-            }
 
             auto textureEntity = engineWorld_.find(textureHandle);
 
@@ -541,7 +534,7 @@ export namespace helios::opengl {
                 return;
             }
             if (!currentShaderHandle_.isValid()) {
-                logger_.error("Expected valid currentShaderHandle_, but found {0}.", currentShaderHandle_.entityId);
+                logger_.error("Expected valid currentShaderHandle_, but found {0}.", currentShaderHandle_.entityId());
                 return;
             }
 
