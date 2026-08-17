@@ -17,8 +17,8 @@ module;
 
 export module helios.opengl.OpenGLMeshUploadManager;
 
-import helios.engine.util.log;
-import helios.engine.util.io;
+import helios.core.log;
+import helios.core.io;
 
 import helios.engine.rendering.common.types.Vertex;
 import helios.engine.rendering.mesh.commands;
@@ -27,10 +27,7 @@ import helios.engine.rendering.mesh.MeshEntity;
 import helios.engine.rendering.mesh.types;
 import helios.engine.rendering.mesh.concepts;
 
-import helios.engine.runtime.world.EngineWorld;
-import helios.engine.runtime.messaging.command.concepts;
-import helios.engine.runtime.messaging.command.NullCommandBuffer;
-import helios.engine.runtime.messaging.command.CommandHandlerRegistry;
+import helios.ecs;
 import helios.engine.runtime.concepts;
 import helios.engine.runtime.world.tags;
 import helios.engine.runtime.world;
@@ -40,8 +37,8 @@ import helios.opengl.components.OpenGLMeshComponent;
 import helios.opengl.OpenGLEnumMapper;
 
 using namespace helios::engine::runtime::world;
-using namespace helios::engine::util::log;
-using namespace helios::engine::util::io;
+using namespace helios::core::log;
+using namespace helios::core::io;
 using namespace helios::engine::runtime::world::tags;
 using namespace helios::engine::rendering::mesh::commands;
 using namespace helios::engine::rendering::mesh::components;
@@ -52,8 +49,8 @@ using namespace helios::engine::rendering::mesh::commands;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::opengl;
 using namespace helios::opengl::components;
-using namespace helios::engine::runtime::messaging::command::concepts;
-using namespace helios::engine::runtime::messaging::command;
+using namespace helios::ecs::common::concepts;
+using namespace helios::ecs;
 
 #define HELIOS_LOG_SCOPE "helios::opengl::OpenGLMeshUploadManager"
 export namespace helios::opengl {
@@ -62,16 +59,17 @@ export namespace helios::opengl {
      * @brief Manager that consumes mesh-upload commands and performs OpenGL buffer setup.
      *
      * @tparam THandle Mesh handle type.
-     * @tparam TCommandBuffer Command buffer type (kept for compatibility with runtime wiring).
      */
-    template<typename THandle, typename TCommandBuffer = NullCommandBuffer>
-    requires IsMeshHandle<THandle> && IsCommandBufferLike<TCommandBuffer>
+    template<typename TInitContext, typename TExecutionContext, typename THandle = MeshHandle>
+    requires IsMeshHandle<THandle>  &&
+            engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
+            ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
     class OpenGLMeshUploadManager {
 
         /**
          * @brief Render-resource world used to resolve mesh entities by handle.
          */
-        RenderResourceWorld& renderResourceWorld_;
+        ecs::EntitySpace& entitySpace_;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
@@ -239,20 +237,19 @@ export namespace helios::opengl {
 
         public:
 
+        using EcsRoleTag = ecs::manager::tags::ManagerRole;
+        using ExecutionContextType = TExecutionContext;
+        using InitContextType = TInitContext;
+
         /**
          * @brief Constructs the manager with access to render-resource storage.
          *
-         * @param renderResourceWorld Render-resource world used to resolve mesh entities.
+         * @param entitySpace Render-resource world used to resolve mesh entities.
          */
-        explicit OpenGLMeshUploadManager(RenderResourceWorld& renderResourceWorld)
+        explicit OpenGLMeshUploadManager(ecs::EntitySpace& entitySpace)
         :
-        renderResourceWorld_(renderResourceWorld)
+        entitySpace_(entitySpace)
         { }
-
-        /**
-         * @brief Engine role marker used by runtime registries.
-         */
-        using EngineRoleTag = ManagerRole;
 
 
         /**
@@ -260,14 +257,14 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        void flush(UpdateContext& updateContext)  noexcept {
+        bool executeCommands(TExecutionContext&)  noexcept {
 
             if (meshHandles_.empty()) {
-                return;
+                return true;
             }
 
             for (const auto& sourceHandle : meshHandles_) {
-                auto meshEntity = renderResourceWorld_.findEntity<THandle>(sourceHandle);
+                auto meshEntity = entitySpace_.findEntity<THandle>(sourceHandle);
 
                 if (!meshEntity) {
                     logger_.error("Could not find mesh entity");
@@ -277,12 +274,15 @@ export namespace helios::opengl {
 
                 if (!upload(*meshEntity)) {
                     logger_.error("Could not compile mesh");
+                    return false;
                 } else {
                     meshEntity->template remove<MeshUploadRequestComponent<THandle>>();
                 }
             }
 
             meshHandles_.clear();
+
+            return true;
         }
 
         /**
@@ -306,10 +306,15 @@ export namespace helios::opengl {
          * @param commandHandlerRegistry Registry used for command-handler registration.
          * @param managerRegistry
          */
-        void init(
-            helios::engine::runtime::messaging::command::CommandHandlerRegistry& commandHandlerRegistry
-            ) noexcept {
-            commandHandlerRegistry.registerHandler<MeshBatchUploadCommand<THandle>>(*this);
+        bool init(TInitContext& initContext) noexcept {
+            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
+
+            commandHandlerRegistry.template registerHandler<MeshBatchUploadCommand<THandle>>(*this);
+            return true;
+        }
+
+        void reset() {
+            /*intentionally left noop*/
         }
 
     };

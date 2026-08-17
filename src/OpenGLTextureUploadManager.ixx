@@ -11,10 +11,8 @@ module;
 
 export module helios.opengl.OpenGLTextureUploadManager;
 
-import helios.engine.util.log;
-import helios.engine.util.io;
-
-import helios.engine.util.io;
+import helios.core.log;
+import helios.core.io;
 
 import helios.engine.rendering.common.types.Vertex;
 import helios.engine.rendering.texture.commands;
@@ -23,26 +21,23 @@ import helios.engine.rendering.texture.TextureEntity;
 import helios.engine.rendering.texture.types;
 import helios.engine.rendering.texture.concepts;
 
-import helios.engine.runtime.world.EngineWorld;
-import helios.engine.runtime.messaging.command.concepts;
-import helios.engine.runtime.messaging.command.NullCommandBuffer;
-import helios.engine.runtime.messaging.command.CommandHandlerRegistry;
+import helios.ecs;
 import helios.engine.runtime.concepts;
 import helios.engine.runtime.world.tags;
 import helios.engine.runtime.world;
 
 import helios.opengl.components;
 
-using namespace helios::engine::util::io;
+using namespace helios::core::io;
 using namespace helios::engine::runtime::world;
-using namespace helios::engine::util::log;
-using namespace helios::engine::util::io;
+using namespace helios::core::log;
+using namespace helios::core::io;
 using namespace helios::engine::runtime::world::tags;
 
 using namespace helios::engine::rendering;
 using namespace helios::opengl::components;
-using namespace helios::engine::runtime::messaging::command::concepts;
-using namespace helios::engine::runtime::messaging::command;
+using namespace helios::ecs::common::concepts;
+using namespace helios::ecs;
 
 #define HELIOS_LOG_SCOPE "helios::opengl::OpenGLTextureUploadManager"
 export namespace helios::opengl {
@@ -53,14 +48,16 @@ export namespace helios::opengl {
      * @tparam THandle Mesh handle type.
      * @tparam TCommandBuffer Command buffer type (kept for compatibility with runtime wiring).
      */
-    template<typename THandle = texture::types::TextureHandle>
-    requires texture::concepts::IsTextureHandle<THandle>
+    template<typename TInitContext, typename TExecutionContext, typename THandle = texture::types::TextureHandle>
+    requires texture::concepts::IsTextureHandle<THandle> &&
+            engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
+            ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
     class OpenGLTextureUploadManager {
 
         /**
          * @brief Render-resource world used to resolve texture entities by handle.
          */
-        RenderResourceWorld& renderResourceWorld_;
+        EntitySpace& entitySpace_;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
@@ -143,37 +140,36 @@ export namespace helios::opengl {
 
         public:
 
+        using EcsRoleTag = ecs::manager::tags::ManagerRole;
+        using InitContextType = TInitContext;
+        using ExecutionContextType = TExecutionContext;
+
+
         /**
          * @brief Constructs the manager with access to render-resource storage.
          *
-         * @param renderResourceWorld Render-resource world used to resolve mesh entities.
+         * @param entitySpace Render-resource world used to resolve mesh entities.
          * @param imageReader Image reader used to load texture data from disk.
          */
-        explicit OpenGLTextureUploadManager(RenderResourceWorld& renderResourceWorld, const ImageReader &imageReader)
+        explicit OpenGLTextureUploadManager(EntitySpace& entitySpace, const ImageReader &imageReader)
         :
-        renderResourceWorld_(renderResourceWorld),
+        entitySpace_(entitySpace),
         imageReader_(imageReader)
         { }
-
-        /**
-         * @brief Engine role marker used by runtime registries.
-         */
-        using EngineRoleTag = ManagerRole;
-
 
         /**
          * @brief Uploads all queued textures and clears processed texture entries.
          *
          * @param updateContext Frame-local update context.
          */
-        void flush(UpdateContext& updateContext)  noexcept {
+        bool executeCommands(TExecutionContext&)  noexcept {
 
             if (textureHandles_.empty()) {
-                return;
+                return true;
             }
 
             for (const auto& sourceHandle : textureHandles_) {
-                auto textureEntity = renderResourceWorld_.findEntity<THandle>(sourceHandle);
+                auto textureEntity = entitySpace_.findEntity<THandle>(sourceHandle);
 
                 if (!textureEntity) {
                     logger_.error("Could not find texture entity");
@@ -193,6 +189,7 @@ export namespace helios::opengl {
             }
 
             textureHandles_.clear();
+            return true;
         }
 
         /**
@@ -215,12 +212,17 @@ export namespace helios::opengl {
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
-        void init(
-            helios::engine::runtime::messaging::command::CommandHandlerRegistry& commandHandlerRegistry
-            ) noexcept {
-            commandHandlerRegistry.registerHandler<texture::commands::TextureBatchUploadCommand<THandle>>(*this);
+        bool init(TInitContext& initContext) noexcept {
+            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
+
+
+            commandHandlerRegistry.template registerHandler<texture::commands::TextureBatchUploadCommand<THandle>>(*this);
+            return true;
         }
 
+        void reset() {
+            /*intentionally noop*/
+        }
     };
 
 

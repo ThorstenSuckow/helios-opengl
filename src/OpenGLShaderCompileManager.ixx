@@ -17,8 +17,8 @@ module;
 
 export module helios.opengl.OpenGLShaderCompileManager;
 
-import helios.engine.util.log;
-import helios.engine.util.io;
+import helios.core.log;
+import helios.core.io;
 import helios.engine.runtime.world.tags;
 import helios.engine.runtime.world;
 import helios.engine.rendering.shader.commands;
@@ -31,15 +31,12 @@ import helios.engine.rendering.shader.NullUniformCacheStrategy;
 
 import helios.opengl.components.OpenGLShaderComponent;
 
-import helios.engine.runtime.world.EngineWorld;
-import helios.engine.runtime.messaging.command.concepts;
-import helios.engine.runtime.messaging.command.NullCommandBuffer;
-import helios.engine.runtime.messaging.command.CommandHandlerRegistry;
+import helios.ecs;
 import helios.engine.runtime.concepts;
 
 using namespace helios::engine::runtime::world;
-using namespace helios::engine::util::log;
-using namespace helios::engine::util::io;
+using namespace helios::core::log;
+using namespace helios::core::io;
 using namespace helios::engine::runtime::world::tags;
 using namespace helios::engine::rendering::shader::commands;
 using namespace helios::engine::rendering::shader::components;
@@ -48,8 +45,8 @@ using namespace helios::engine::rendering::shader::types;
 using namespace helios::engine::rendering::shader::concepts;
 using namespace helios::engine::rendering::shader::commands;
 using namespace helios::opengl::components;
-using namespace helios::engine::runtime::messaging::command::concepts;
-using namespace helios::engine::runtime::messaging::command;
+using namespace helios::ecs::common::concepts;
+using namespace helios::ecs;
 #define HELIOS_LOG_SCOPE "helios::opengl::OpenGLShaderCompileManager"
 export namespace helios::opengl {
 
@@ -59,13 +56,30 @@ export namespace helios::opengl {
      * @tparam THandle Shader handle type.
      * @tparam TUniformCacheStrategy Uniform cache strategy used after successful program linking.
      */
-    template<typename THandle, typename TUniformCacheStrategy = NullUniformCacheStrategy<THandle>>
+    template<
+        typename TInitContext,
+        typename TExecutionContext,
+        typename TUniformCacheStrategy = NullUniformCacheStrategy<ShaderHandle>
+    >
+    class OpenGLShaderCompileManager;
+    
+    template<
+        typename TInitContext,
+        typename TExecutionContext,
+        template<typename> typename TUniformCacheStrategy,
+        typename THandle
+    >
     requires IsShaderHandle<THandle> &&
         IsUniformCacheStrategyLike<
-            TUniformCacheStrategy, THandle, UniformScope::Pass, UniformScope::Material, UniformScope::Draw
-        >
-    class OpenGLShaderCompileManager {
+            TUniformCacheStrategy<THandle>, THandle, UniformScope::Pass, UniformScope::Material, UniformScope::Draw
+        > &&
+        engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
+        ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
+    class OpenGLShaderCompileManager<TInitContext, TExecutionContext, TUniformCacheStrategy<THandle>>  {
 
+        using UniformCacheStrategyType = TUniformCacheStrategy<THandle>;
+        
+        
         /**
          * @brief File reader used to load shader source text from disk.
          */
@@ -74,7 +88,7 @@ export namespace helios::opengl {
         /**
          * @brief Render-resource world used to resolve shader entities by handle.
          */
-        RenderResourceWorld& renderResourceWorld_;
+        ecs::EntitySpace& entitySpace_;
 
         /**
          * @brief Pending shader handles queued for compilation during `flush(...)`.
@@ -100,7 +114,7 @@ export namespace helios::opengl {
         /**
          * @brief Uniform caching strategy executed after successful shader compilation.
          */
-        TUniformCacheStrategy uniformCacheStrategy_;
+        UniformCacheStrategyType uniformCacheStrategy_;
 
         /**
          * @brief Loads the specified vertex and fragment shader.
@@ -224,23 +238,24 @@ export namespace helios::opengl {
         /**
          * @brief Constructs the manager with access to render-resource world storage.
          *
-         * @param renderResourceWorld Render-resource world used to resolve shader entities.
+         * @param entitySpace Render-resource world used to resolve shader entities.
          * @param uniformCacheStrategy Strategy object used to cache pass/draw uniforms.
          */
         explicit OpenGLShaderCompileManager(
-            RenderResourceWorld& renderResourceWorld,
-            TUniformCacheStrategy&& uniformCacheStrategy
+            ecs::EntitySpace& entitySpace,
+            UniformCacheStrategyType&& uniformCacheStrategy
         )
         : 
-        renderResourceWorld_(renderResourceWorld),
+        entitySpace_(entitySpace),
         uniformCacheStrategy_(std::move(uniformCacheStrategy))
         { }
 
         /**
          * @brief Engine role marker used by runtime registries.
          */
-        using EngineRoleTag = ManagerRole;
-
+        using EcsRoleTag = ecs::manager::tags::ManagerRole;
+        using InitContextType = TInitContext;
+        using ExecutionContextType = TExecutionContext;
 
         /**
          * @brief Compiles all queued shaders and clears processed command data.
@@ -250,33 +265,37 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        void flush(UpdateContext& updateContext)  noexcept {
+        bool executeCommands(TExecutionContext&)  noexcept {
 
             if (shaderHandles_.empty()) {
-                return;
+                return true;
             }
 
             for (const auto& sourceHandle : shaderHandles_) {
-                auto shaderEntity = renderResourceWorld_.findEntity<THandle>(sourceHandle);
+                auto shaderEntity = entitySpace_.findEntity<THandle>(sourceHandle);
 
                 if (!shaderEntity) {
                     logger_.error("Could not find shader source");
                     assert(false && "Could not find shader source");
-                    continue;
+                    return false;
                 }
 
                 if (!compile(*shaderEntity)) {
                     logger_.error("Could not compile shader");
+                    assert(false && "Could not compile shader");
+                    return false;
                 } else {
                     shaderEntity->template remove<ShaderSourceComponent<THandle>>();
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), renderResourceWorld_, updateContext);
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), renderResourceWorld_, updateContext);
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), renderResourceWorld_, updateContext);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), entitySpace_);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), entitySpace_);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), entitySpace_);
 
                 }
             }
 
             shaderHandles_.clear();
+
+            return true;
         }
 
         /**
@@ -310,9 +329,17 @@ export namespace helios::opengl {
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
-        void init(helios::engine::runtime::messaging::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
-            commandHandlerRegistry.registerHandler<ShaderCompileCommand<THandle>>(*this);
-            commandHandlerRegistry.registerHandler<ShaderBatchCompileCommand<THandle>>(*this);
+        bool init(TInitContext& initContext) noexcept {
+            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
+
+            commandHandlerRegistry.template registerHandler<ShaderCompileCommand<THandle>>(*this);
+            commandHandlerRegistry.template registerHandler<ShaderBatchCompileCommand<THandle>>(*this);
+
+            return true;
+        }
+
+        void reset() {
+            /*intentionally noop*/
         }
     };
 
