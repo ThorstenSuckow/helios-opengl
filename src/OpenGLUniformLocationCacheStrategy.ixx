@@ -11,12 +11,14 @@ module;
 export module helios.opengl.OpenGLUniformLocationCacheStrategy;
 
 import helios.engine.rendering.shader.components.UniformMappingsComponent;
-import helios.engine.runtime.world.EngineWorld;
+
 import helios.engine.runtime.world.UpdateContext;
 import helios.engine.rendering.shader.concepts.IsShaderHandle;
 import helios.engine.rendering.shader.types;
 
-import helios.engine.util.log;
+import helios.ecs.EntitySpace;
+
+import helios.core.log;
 
 import helios.opengl.components.OpenGLUniformWriteOperationsComponent;
 import helios.opengl.components.OpenGLShaderComponent;
@@ -25,7 +27,7 @@ using namespace helios::engine::runtime::world;
 using namespace helios::engine::rendering::shader::concepts;
 using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::shader::types;
-using namespace helios::engine::util::log;
+using namespace helios::core::log;
 using namespace helios::opengl::components;
 
 #define HELIOS_LOG_SCOPE "helios::opengl::OpenGLUniformLocationCacheStrategy"
@@ -35,7 +37,7 @@ export namespace helios::opengl {
      * @brief Builds OpenGL uniform write-operation plans for one shader entity.
      * @tparam THandle Shader handle type.
      */
-    template<typename THandle>
+    template<typename THandle = ShaderHandle>
     requires IsShaderHandle<THandle>
     class OpenGLUniformLocationCacheStrategy {
 
@@ -48,7 +50,7 @@ export namespace helios::opengl {
          * @brief Resolves configured uniform names and stores write operations.
          * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
          * @param entityHandle Shader entity handle.
-         * @param renderResourceWorld Render-resource world containing shader entities.
+         * @param entitySpace Render-resource world containing shader entities.
          * @param updateContext Frame-local update context.
          * @return `true` when mapping processing completed, otherwise `false`.
          * @details Reads `UniformMappingsComponent`, queries locations via
@@ -59,10 +61,9 @@ export namespace helios::opengl {
         template<typename TUniformScope>
         [[nodiscard]] bool cacheUniforms(
             THandle entityHandle,
-            RenderResourceWorld& renderResourceWorld,
-            UpdateContext& updateContext
+            ecs::EntitySpace& entitySpace
         ) {
-            auto shaderEntity = renderResourceWorld.findEntity(entityHandle);
+            auto shaderEntity = entitySpace.findEntity(entityHandle);
 
             if (!shaderEntity) {
                 logger_.error("ShaderEntity not found.");

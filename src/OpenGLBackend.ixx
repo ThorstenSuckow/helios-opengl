@@ -18,7 +18,9 @@ export module helios.opengl.OpenGLBackend;
 
 import helios.math;
 
-import helios.engine.util.log;
+import helios.core.log;
+
+import helios.ecs.EntitySpace;
 
 import helios.engine.rendering.viewport.ViewportEntity;
 
@@ -46,8 +48,6 @@ import helios.engine.util.Colors;
 import helios.engine.scene.components;
 import helios.engine.scene.types;
 
-import helios.engine.runtime.world.EngineWorld;
-
 import helios.opengl.types;
 
 using namespace helios::engine::core::components;
@@ -72,8 +72,7 @@ using namespace helios::engine::rendering::viewport;
 using namespace helios::engine::rendering::viewport::types;
 using namespace helios::engine::scene::components;
 using namespace helios::engine::scene::types;
-using namespace helios::engine::runtime::world;
-using namespace helios::engine::util::log;
+using namespace helios::core::log;
 
 #define HELIOS_LOG_SCOPE "helios::opengl"
 export namespace helios::opengl {
@@ -96,7 +95,7 @@ export namespace helios::opengl {
         /**
          * @brief Scoped logger used for backend diagnostics.
          */
-        inline static const helios::engine::util::log::Logger& logger_ = helios::engine::util::log::LogManager::loggerForScope(
+        inline static const helios::core::log::Logger& logger_ = helios::core::log::LogManager::loggerForScope(
             HELIOS_LOG_SCOPE
         );
 
@@ -134,7 +133,7 @@ export namespace helios::opengl {
         /**
          * @brief Engine world used to resolve render entities and components.
          */
-        EngineWorld& engineWorld_;
+        ecs::EntitySpace& entitySpace_;
 
         /**
          * @brief Per-viewport camera matrices used for a render pass.
@@ -157,19 +156,19 @@ export namespace helios::opengl {
                 logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
                 return std::nullopt;
             }
-            auto camera = engineWorld_.find(cbc->targetHandle());
+            auto camera = entitySpace_.findEntity(cbc->targetHandle());
             if (!camera) {
                 logger_.error("Expected CameraEntity, but couldn't find any.");
                 return std::nullopt;
             }
             using CameraHandleType = std::remove_cvref_t<decltype(cbc->targetHandle())>;
-            auto* vm = camera->get<ViewMatrixComponent<CameraHandleType>>();
+            auto* vm = camera->template get<ViewMatrixComponent<CameraHandleType>>();
             if (!vm) {
                 logger_.error("Expected ViewMatrixComponent, but couldn't find any.");
                 return std::nullopt;
             }
 
-            auto* pm = camera->get<ProjectionMatrixComponent<CameraHandleType>>();
+            auto* pm = camera->template get<ProjectionMatrixComponent<CameraHandleType>>();
             if (!pm) {
                 logger_.error("Expected ProjectionMatrixComponent, but couldn't find any.");
                 return std::nullopt;
@@ -248,7 +247,7 @@ export namespace helios::opengl {
          *
          * @param engineWorld Engine world providing render resources and targets.
          */
-        explicit OpenGLBackend(EngineWorld& engineWorld) : engineWorld_(engineWorld) {}
+        explicit OpenGLBackend(ecs::EntitySpace& entitySpace) : entitySpace_(entitySpace) {}
 
 
         /**
@@ -261,7 +260,7 @@ export namespace helios::opengl {
          */
         void beginRenderTargetBatch(const RenderTargetHandle renderTargetHandle) noexcept {
 
-            auto renderTargetEntity = engineWorld_.find<RenderTargetHandle>(renderTargetHandle);
+            auto renderTargetEntity = entitySpace_.template findEntity<RenderTargetHandle>(renderTargetHandle);
 
             #ifdef HELIOS_DEBUG
             if (!renderTargetEntity) {
@@ -272,7 +271,7 @@ export namespace helios::opengl {
 
             currentRenderTargetHandle_ = renderTargetHandle;
 
-            const auto renderTargetId = renderTargetEntity->get<OpenGLRenderTargetIdComponent<RenderTargetHandle>>()->value();
+            const auto renderTargetId = renderTargetEntity->template get<OpenGLRenderTargetIdComponent<RenderTargetHandle>>()->value();
 
             glBindFramebuffer(GL_FRAMEBUFFER, renderTargetId);
 
@@ -285,7 +284,7 @@ export namespace helios::opengl {
             }
             #endif
 
-            auto renderTargetSize = renderTargetEntity->get<Size2DComponent<RenderTargetHandle>>()->value();
+            auto renderTargetSize = renderTargetEntity->template get<Size2DComponent<RenderTargetHandle>>()->value();
 
             glViewport(0, 0,
                 static_cast<int>(renderTargetSize[0]),
@@ -323,8 +322,8 @@ export namespace helios::opengl {
          */
         void beginViewportBatch(const ViewportHandle viewportHandle) noexcept {
 
-            auto viewport = engineWorld_.find<ViewportHandle>(viewportHandle);
-            auto renderTargetEntity = engineWorld_.find<RenderTargetHandle>(currentRenderTargetHandle_);
+            auto viewport = entitySpace_.template findEntity<ViewportHandle>(viewportHandle);
+            auto renderTargetEntity = entitySpace_.template findEntity<RenderTargetHandle>(currentRenderTargetHandle_);
 
             #ifdef HELIOS_DEBUG
             if (!renderTargetEntity) {
@@ -347,8 +346,8 @@ export namespace helios::opengl {
                 passUniformValueBag_.set<ViewMatrixUniform>(vp->viewMatrix);
             }
 
-            auto viewportBounds  = viewport->get<RectComponent<ViewportHandle>>()->value();
-            auto renderTargetSize = renderTargetEntity->get<Size2DComponent<RenderTargetHandle>>()->value();
+            auto viewportBounds  = viewport->template get<RectComponent<ViewportHandle>>()->value();
+            auto renderTargetSize = renderTargetEntity->template get<Size2DComponent<RenderTargetHandle>>()->value();
 
             const auto x = static_cast<int>(renderTargetSize[0] * viewportBounds[0]);
             const auto y = static_cast<int>(renderTargetSize[1] * viewportBounds[1]);
@@ -381,7 +380,7 @@ export namespace helios::opengl {
          */
         void beginShaderBatch(ShaderHandle shaderHandle) noexcept {
 
-            auto shaderEntity = engineWorld_.find(shaderHandle);
+            auto shaderEntity = entitySpace_.findEntity(shaderHandle);
             if (!shaderEntity) {
                 logger_.error("ShaderEntity expected, but not found");
                 assert(false && "ShaderEntity not found");
@@ -418,7 +417,7 @@ export namespace helios::opengl {
         void beginTextureBatch(TextureHandle textureHandle) noexcept {
 
 
-            auto textureEntity = engineWorld_.find(textureHandle);
+            auto textureEntity = entitySpace_.findEntity(textureHandle);
 
             if (!textureEntity) {
                 logger_.error("TextureEntity expected, but not found");
@@ -454,7 +453,7 @@ export namespace helios::opengl {
          * @param materialHandle Material handle for this batch.
          */
         void beginMaterialBatch(MaterialHandle materialHandle) noexcept {
-            auto materialEntity = engineWorld_.find(materialHandle);
+            auto materialEntity = entitySpace_.findEntity(materialHandle);
             if (!materialEntity) {
                 logger_.error("MaterialEntity expected, but not found");
                 assert(false && "MaterialEntity not found");
@@ -464,7 +463,7 @@ export namespace helios::opengl {
             auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
             if (colorComponent) {
                 materialUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
-                const auto shaderEntity = engineWorld_.find(currentShaderHandle_);
+                const auto shaderEntity = entitySpace_.findEntity(currentShaderHandle_);
                 assert(shaderEntity && "ShaderEntity expected, but not found");
                 writeUniformValues<UniformScope::Material>(*shaderEntity, materialUniformValueBag_);
             }
@@ -489,7 +488,7 @@ export namespace helios::opengl {
          */
         void beginMeshBatch(MeshHandle meshHandle) noexcept {
 
-            auto meshEntity = engineWorld_.find(meshHandle);
+            auto meshEntity = entitySpace_.findEntity(meshHandle);
             if (!meshEntity) {
                 logger_.error("MeshEntity expected, but not found");
                 assert(false && "MeshEntity not found");
@@ -538,7 +537,7 @@ export namespace helios::opengl {
                 return;
             }
 
-            const auto shaderEntity = engineWorld_.find(currentShaderHandle_);
+            const auto shaderEntity = entitySpace_.findEntity(currentShaderHandle_);
 
             assert(shaderEntity && "ShaderEntity expected, but not found");
             assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
