@@ -88,7 +88,7 @@ export namespace helios::opengl {
         /**
          * @brief Render-resource world used to resolve shader entities by handle.
          */
-        ecs::EntitySpace& entitySpace_;
+        ecs::EcsWorld& ecsWorld_;
 
         /**
          * @brief Pending shader handles queued for compilation during `flush(...)`.
@@ -238,15 +238,15 @@ export namespace helios::opengl {
         /**
          * @brief Constructs the manager with access to render-resource world storage.
          *
-         * @param entitySpace Render-resource world used to resolve shader entities.
+         * @param ecsWorld Render-resource world used to resolve shader entities.
          * @param uniformCacheStrategy Strategy object used to cache pass/draw uniforms.
          */
         explicit OpenGLShaderCompileManager(
-            ecs::EntitySpace& entitySpace,
+            ecs::EcsWorld& ecsWorld,
             UniformCacheStrategyType&& uniformCacheStrategy
         )
         : 
-        entitySpace_(entitySpace),
+        ecsWorld_(ecsWorld),
         uniformCacheStrategy_(std::move(uniformCacheStrategy))
         { }
 
@@ -272,7 +272,7 @@ export namespace helios::opengl {
             }
 
             for (const auto& sourceHandle : shaderHandles_) {
-                auto shaderEntity = entitySpace_.findEntity<THandle>(sourceHandle);
+                auto shaderEntity = ecsWorld_.find<THandle>(sourceHandle);
 
                 if (!shaderEntity) {
                     logger_.error("Could not find shader source");
@@ -286,9 +286,9 @@ export namespace helios::opengl {
                     return false;
                 } else {
                     shaderEntity->template remove<ShaderSourceComponent<THandle>>();
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), entitySpace_);
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), entitySpace_);
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), entitySpace_);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), ecsWorld_);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), ecsWorld_);
+                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), ecsWorld_);
 
                 }
             }

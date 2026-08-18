@@ -57,7 +57,7 @@ export namespace helios::opengl {
         /**
          * @brief Render-resource world used to resolve texture entities by handle.
          */
-        EntitySpace& entitySpace_;
+        EcsWorld& ecsWorld_;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
@@ -148,12 +148,12 @@ export namespace helios::opengl {
         /**
          * @brief Constructs the manager with access to render-resource storage.
          *
-         * @param entitySpace Render-resource world used to resolve mesh entities.
+         * @param ecsWorld Render-resource world used to resolve mesh entities.
          * @param imageReader Image reader used to load texture data from disk.
          */
-        explicit OpenGLTextureUploadManager(EntitySpace& entitySpace, const ImageReader &imageReader)
+        explicit OpenGLTextureUploadManager(EcsWorld& ecsWorld, const ImageReader &imageReader)
         :
-        entitySpace_(entitySpace),
+        ecsWorld_(ecsWorld),
         imageReader_(imageReader)
         { }
 
@@ -169,7 +169,7 @@ export namespace helios::opengl {
             }
 
             for (const auto& sourceHandle : textureHandles_) {
-                auto textureEntity = entitySpace_.findEntity<THandle>(sourceHandle);
+                auto textureEntity = ecsWorld_.find<THandle>(sourceHandle);
 
                 if (!textureEntity) {
                     logger_.error("Could not find texture entity");

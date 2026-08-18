@@ -16,7 +16,7 @@ import helios.engine.runtime.world.UpdateContext;
 import helios.engine.rendering.shader.concepts.IsShaderHandle;
 import helios.engine.rendering.shader.types;
 
-import helios.ecs.EntitySpace;
+import helios.ecs.EcsWorld;
 
 import helios.core.log;
 
@@ -50,7 +50,7 @@ export namespace helios::opengl {
          * @brief Resolves configured uniform names and stores write operations.
          * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
          * @param entityHandle Shader entity handle.
-         * @param entitySpace Render-resource world containing shader entities.
+         * @param ecsWorld Render-resource world containing shader entities.
          * @param updateContext Frame-local update context.
          * @return `true` when mapping processing completed, otherwise `false`.
          * @details Reads `UniformMappingsComponent`, queries locations via
@@ -61,9 +61,9 @@ export namespace helios::opengl {
         template<typename TUniformScope>
         [[nodiscard]] bool cacheUniforms(
             THandle entityHandle,
-            ecs::EntitySpace& entitySpace
+            ecs::EcsWorld& ecsWorld
         ) {
-            auto shaderEntity = entitySpace.findEntity(entityHandle);
+            auto shaderEntity = ecsWorld.find(entityHandle);
 
             if (!shaderEntity) {
                 logger_.error("ShaderEntity not found.");

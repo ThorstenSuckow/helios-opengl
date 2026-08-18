@@ -69,7 +69,7 @@ export namespace helios::opengl {
         /**
          * @brief Render-resource world used to resolve mesh entities by handle.
          */
-        ecs::EntitySpace& entitySpace_;
+        ecs::EcsWorld& ecsWorld_;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
@@ -244,11 +244,11 @@ export namespace helios::opengl {
         /**
          * @brief Constructs the manager with access to render-resource storage.
          *
-         * @param entitySpace Render-resource world used to resolve mesh entities.
+         * @param ecsWorld Render-resource world used to resolve mesh entities.
          */
-        explicit OpenGLMeshUploadManager(ecs::EntitySpace& entitySpace)
+        explicit OpenGLMeshUploadManager(ecs::EcsWorld& ecsWorld)
         :
-        entitySpace_(entitySpace)
+        ecsWorld_(ecsWorld)
         { }
 
 
@@ -264,7 +264,7 @@ export namespace helios::opengl {
             }
 
             for (const auto& sourceHandle : meshHandles_) {
-                auto meshEntity = entitySpace_.findEntity<THandle>(sourceHandle);
+                auto meshEntity = ecsWorld_.find<THandle>(sourceHandle);
 
                 if (!meshEntity) {
                     logger_.error("Could not find mesh entity");
