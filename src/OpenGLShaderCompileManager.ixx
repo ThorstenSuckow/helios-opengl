@@ -19,7 +19,7 @@ export module helios.opengl.OpenGLShaderCompileManager;
 
 import helios.core.log;
 import helios.core.io;
-import helios.engine.runtime.world.tags;
+
 import helios.engine.runtime.world;
 import helios.engine.rendering.shader.commands;
 import helios.engine.rendering.shader.components;
@@ -37,7 +37,7 @@ import helios.engine.runtime.concepts;
 using namespace helios::engine::runtime::world;
 using namespace helios::core::log;
 using namespace helios::core::io;
-using namespace helios::engine::runtime::world::tags;
+
 using namespace helios::engine::rendering::shader::commands;
 using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::shader;
@@ -73,7 +73,7 @@ export namespace helios::opengl {
         IsUniformCacheStrategyLike<
             TUniformCacheStrategy<THandle>, THandle, UniformScope::Pass, UniformScope::Material, UniformScope::Draw
         > &&
-        engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
+        engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
         ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
     class OpenGLShaderCompileManager<TInitContext, TExecutionContext, TUniformCacheStrategy<THandle>>  {
 

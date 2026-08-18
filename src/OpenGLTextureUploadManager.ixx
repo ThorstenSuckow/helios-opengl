@@ -23,7 +23,7 @@ import helios.engine.rendering.texture.concepts;
 
 import helios.ecs;
 import helios.engine.runtime.concepts;
-import helios.engine.runtime.world.tags;
+
 import helios.engine.runtime.world;
 
 import helios.opengl.components;
@@ -32,7 +32,7 @@ using namespace helios::core::io;
 using namespace helios::engine::runtime::world;
 using namespace helios::core::log;
 using namespace helios::core::io;
-using namespace helios::engine::runtime::world::tags;
+
 
 using namespace helios::engine::rendering;
 using namespace helios::opengl::components;
@@ -50,7 +50,7 @@ export namespace helios::opengl {
      */
     template<typename TInitContext, typename TExecutionContext, typename THandle = texture::types::TextureHandle>
     requires texture::concepts::IsTextureHandle<THandle> &&
-            engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
+            engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
             ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
     class OpenGLTextureUploadManager {
 

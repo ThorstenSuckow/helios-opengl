@@ -29,7 +29,7 @@ import helios.engine.rendering.mesh.concepts;
 
 import helios.ecs;
 import helios.engine.runtime.concepts;
-import helios.engine.runtime.world.tags;
+
 import helios.engine.runtime.world;
 
 
@@ -39,7 +39,7 @@ import helios.opengl.OpenGLEnumMapper;
 using namespace helios::engine::runtime::world;
 using namespace helios::core::log;
 using namespace helios::core::io;
-using namespace helios::engine::runtime::world::tags;
+
 using namespace helios::engine::rendering::mesh::commands;
 using namespace helios::engine::rendering::mesh::components;
 using namespace helios::engine::rendering::mesh;
@@ -62,7 +62,7 @@ export namespace helios::opengl {
      */
     template<typename TInitContext, typename TExecutionContext, typename THandle = MeshHandle>
     requires IsMeshHandle<THandle>  &&
-            engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
+            engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
             ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
     class OpenGLMeshUploadManager {
 
