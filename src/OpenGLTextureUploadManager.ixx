@@ -48,10 +48,8 @@ export namespace helios::opengl {
      * @tparam THandle Mesh handle type.
      * @tparam TCommandBuffer Command buffer type (kept for compatibility with runtime wiring).
      */
-    template<typename TInitContext, typename TExecutionContext, typename THandle = texture::types::TextureHandle>
-    requires texture::concepts::IsTextureHandle<THandle> &&
-            engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
-            ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
+    template<typename THandle = texture::types::TextureHandle>
+    requires texture::concepts::IsTextureHandle<THandle>
     class OpenGLTextureUploadManager {
 
         /**
@@ -141,9 +139,6 @@ export namespace helios::opengl {
         public:
 
         using EcsRoleTag = ecs::manager::tags::ManagerRole;
-        using InitContextType = TInitContext;
-        using ExecutionContextType = TExecutionContext;
-
 
         /**
          * @brief Constructs the manager with access to render-resource storage.
@@ -162,6 +157,8 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
+        template<typename TExecutionContext>
+        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
         bool executeCommands(TExecutionContext&)  noexcept {
 
             if (textureHandles_.empty()) {
@@ -212,6 +209,8 @@ export namespace helios::opengl {
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
+        template<typename TInitContext>
+        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
         bool init(TInitContext& initContext) noexcept {
             auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
 

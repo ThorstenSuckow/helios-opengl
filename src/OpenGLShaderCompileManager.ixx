@@ -57,25 +57,19 @@ export namespace helios::opengl {
      * @tparam TUniformCacheStrategy Uniform cache strategy used after successful program linking.
      */
     template<
-        typename TInitContext,
-        typename TExecutionContext,
         typename TUniformCacheStrategy = NullUniformCacheStrategy<ShaderHandle>
     >
     class OpenGLShaderCompileManager;
     
     template<
-        typename TInitContext,
-        typename TExecutionContext,
         template<typename> typename TUniformCacheStrategy,
         typename THandle
     >
     requires IsShaderHandle<THandle> &&
         IsUniformCacheStrategyLike<
             TUniformCacheStrategy<THandle>, THandle, UniformScope::Pass, UniformScope::Material, UniformScope::Draw
-        > &&
-        engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext> &&
-        ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
-    class OpenGLShaderCompileManager<TInitContext, TExecutionContext, TUniformCacheStrategy<THandle>>  {
+        >
+    class OpenGLShaderCompileManager<TUniformCacheStrategy<THandle>>  {
 
         using UniformCacheStrategyType = TUniformCacheStrategy<THandle>;
         
@@ -254,8 +248,6 @@ export namespace helios::opengl {
          * @brief Engine role marker used by runtime registries.
          */
         using EcsRoleTag = ecs::manager::tags::ManagerRole;
-        using InitContextType = TInitContext;
-        using ExecutionContextType = TExecutionContext;
 
         /**
          * @brief Compiles all queued shaders and clears processed command data.
@@ -265,6 +257,8 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
+        template<typename TExecutionContext>
+        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
         bool executeCommands(TExecutionContext&)  noexcept {
 
             if (shaderHandles_.empty()) {
@@ -329,6 +323,8 @@ export namespace helios::opengl {
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
+        template<typename TInitContext>
+        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
         bool init(TInitContext& initContext) noexcept {
             auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
 
