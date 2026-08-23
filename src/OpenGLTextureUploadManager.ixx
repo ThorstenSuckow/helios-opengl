@@ -138,7 +138,6 @@ export namespace helios::opengl {
 
         public:
 
-        using EcsRoleTag = ecs::manager::tags::ManagerRole;
 
         /**
          * @brief Constructs the manager with access to render-resource storage.
@@ -157,9 +156,7 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        template<typename TExecutionContext>
-        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
-        bool executeCommands(TExecutionContext&)  noexcept {
+        bool executeCommands()  noexcept {
 
             if (textureHandles_.empty()) {
                 return true;
@@ -209,12 +206,7 @@ export namespace helios::opengl {
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
-        template<typename TInitContext>
-        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
-        bool init(TInitContext& initContext) noexcept {
-            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
-
-
+        bool init(ecs::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
             commandHandlerRegistry.template registerHandler<texture::commands::TextureBatchUploadCommand<THandle>>(*this);
             return true;
         }

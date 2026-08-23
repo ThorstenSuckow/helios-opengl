@@ -235,7 +235,6 @@ export namespace helios::opengl {
 
         public:
 
-        using EcsRoleTag = ecs::manager::tags::ManagerRole;
 
         /**
          * @brief Constructs the manager with access to render-resource storage.
@@ -253,9 +252,7 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        template<typename TExecutionContext>
-        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
-        bool executeCommands(TExecutionContext&)  noexcept {
+        bool executeCommands()  noexcept {
 
             if (meshHandles_.empty()) {
                 return true;
@@ -273,9 +270,10 @@ export namespace helios::opengl {
                 if (!upload(*meshEntity)) {
                     logger_.error("Could not compile mesh");
                     return false;
-                } else {
-                    meshEntity->template remove<MeshUploadRequestComponent<THandle>>();
                 }
+
+                meshEntity->template remove<MeshUploadRequestComponent<THandle>>();
+
             }
 
             meshHandles_.clear();
@@ -304,10 +302,7 @@ export namespace helios::opengl {
          * @param commandHandlerRegistry Registry used for command-handler registration.
          * @param managerRegistry
          */
-        template<typename TInitContext>
-        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
-        bool init(TInitContext& initContext) noexcept {
-            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
+        bool init(ecs::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
 
             commandHandlerRegistry.template registerHandler<MeshBatchUploadCommand<THandle>>(*this);
             return true;

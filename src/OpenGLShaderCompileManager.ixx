@@ -244,10 +244,6 @@ export namespace helios::opengl {
         uniformCacheStrategy_(std::move(uniformCacheStrategy))
         { }
 
-        /**
-         * @brief Engine role marker used by runtime registries.
-         */
-        using EcsRoleTag = ecs::manager::tags::ManagerRole;
 
         /**
          * @brief Compiles all queued shaders and clears processed command data.
@@ -257,9 +253,7 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        template<typename TExecutionContext>
-        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
-        bool executeCommands(TExecutionContext&)  noexcept {
+        bool executeCommands()  noexcept {
 
             if (shaderHandles_.empty()) {
                 return true;
@@ -323,10 +317,7 @@ export namespace helios::opengl {
          *
          * @param commandHandlerRegistry Registry used for command-handler registration.
          */
-        template<typename TInitContext>
-        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
-        bool init(TInitContext& initContext) noexcept {
-            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
+        bool init(ecs::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
 
             commandHandlerRegistry.template registerHandler<ShaderCompileCommand<THandle>>(*this);
             commandHandlerRegistry.template registerHandler<ShaderBatchCompileCommand<THandle>>(*this);
