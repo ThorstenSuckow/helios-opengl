@@ -227,6 +227,8 @@ export namespace helios::opengl {
                 mesh.template remove<VertexAttributeLayoutComponent<Handle, PerInstance>>();
             }
 
+            mesh.remove<MeshDataComponent<Handle>>();
+
 
             glBindVertexArray(0);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
