@@ -577,7 +577,7 @@ export namespace helios::opengl {
 
             const auto instanceSize = instanceData.size();
 
-            assert(instanceSize <= 1000000 && "Instance data size seems unreasonably large.");
+            assert(instanceSize <= 1'000'000 && "Instance data size seems unreasonably large.");
 
             if (instanceSize <= 0) {
                 return;
