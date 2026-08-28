@@ -182,25 +182,25 @@ export namespace helios::opengl {
 
             auto& openglMesh = mesh.template add<OpenGLMeshComponent<Handle>>();
 
-            openglMesh.indexCount    = meshData.indices.size();
-            openglMesh.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
+            openglMesh.data.indexCount    = meshData.indices.size();
+            openglMesh.data.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
             auto* vertexAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<Handle, PerVertex>>();
             assert(vertexAttributeLayoutComponent && "Expected a VertexAttributeLayoutComponent for PerVertex attributes");
             auto* instancedAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<Handle, PerInstance>>();
 
-            glGenVertexArrays(1, &openglMesh.vao);
-            glGenBuffers(1, &openglMesh.vbo);
-            glGenBuffers(1, &openglMesh.ebo);
+            glGenVertexArrays(1, &openglMesh.data.vao);
+            glGenBuffers(1, &openglMesh.data.vbo);
+            glGenBuffers(1, &openglMesh.data.ebo);
 
             if (instancedAttributeLayoutComponent) {
-                glGenBuffers(1, &openglMesh.instanceVbo);
+                glGenBuffers(1, &openglMesh.data.instanceVbo);
             }
 
-            glBindVertexArray(openglMesh.vao);
+            glBindVertexArray(openglMesh.data.vao);
 
             // vertex buffer
-            glBindBuffer(GL_ARRAY_BUFFER, openglMesh.vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, openglMesh.data.vbo);
             glBufferData(
                 GL_ARRAY_BUFFER,
                 meshData.vertices.size() * sizeof(Vertex),
@@ -209,7 +209,7 @@ export namespace helios::opengl {
             );
 
             // element buffer
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, openglMesh.ebo);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, openglMesh.data.ebo);
             glBufferData(
                 GL_ELEMENT_ARRAY_BUFFER,
                 meshData.indices.size() * sizeof(unsigned int),
@@ -222,7 +222,7 @@ export namespace helios::opengl {
             mesh.template remove<VertexAttributeLayoutComponent<Handle, PerVertex>>();
 
             if (instancedAttributeLayoutComponent) {
-                glBindBuffer(GL_ARRAY_BUFFER, openglMesh.instanceVbo);
+                glBindBuffer(GL_ARRAY_BUFFER, openglMesh.data.instanceVbo);
                 buildVertexAttributeLayout<PerInstance>(instancedAttributeLayoutComponent);
                 mesh.template remove<VertexAttributeLayoutComponent<Handle, PerInstance>>();
             }
