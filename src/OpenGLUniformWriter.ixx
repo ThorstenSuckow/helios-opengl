@@ -42,7 +42,7 @@ export namespace helios::opengl {
          */
         template<typename TUniformScope>
         static void write(
-            std::span<OpenGLUniformWriteOperation> operations,
+            std::span<const OpenGLUniformWriteOperation> operations,
             UniformValueBag<TUniformScope>& uniformValueBag
         ) noexcept {
 
