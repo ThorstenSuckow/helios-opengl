@@ -20,22 +20,13 @@ import helios.math;
 
 import helios.core.log;
 
-import helios.ecs.EcsWorld;
-
 import helios.engine.rendering.viewport.ViewportEntity;
 
 import helios.engine.rendering.renderTarget.RenderTargetEntity;
 import helios.engine.rendering.common.types;
-import helios.engine.rendering.common.components;
-
-import helios.engine.spatial.components;
-
-import helios.engine.core.components;
 
 import helios.opengl.OpenGLUniformWriter;
-import helios.opengl.components;
 import helios.opengl.types;
-
 
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
@@ -50,27 +41,19 @@ import helios.engine.scene.types;
 
 import helios.opengl.types;
 
-using namespace helios::engine::core::components;
 using namespace helios::engine::rendering;
-using namespace helios::engine::rendering::mesh::components;
 using namespace helios::engine::rendering::shader;
 using namespace helios::engine::rendering::shader::types;
 using namespace helios::opengl;
-using namespace helios::opengl::components;
 using namespace helios::opengl::types;
-using namespace helios::engine::spatial::components;
 using namespace helios::engine::rendering::material::types;
 using namespace helios::engine::rendering::texture::types;
-using namespace helios::engine::rendering::texture::components;
 using namespace helios::engine::rendering::common::types;
-using namespace helios::engine::rendering::common::components;
-using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::mesh::types;
 using namespace helios::engine::rendering::renderTarget;
 using namespace helios::engine::rendering::renderTarget::types;
 using namespace helios::engine::rendering::viewport;
 using namespace helios::engine::rendering::viewport::types;
-using namespace helios::engine::scene::components;
 using namespace helios::engine::scene::types;
 using namespace helios::core::log;
 
@@ -99,10 +82,10 @@ export namespace helios::opengl {
             HELIOS_LOG_SCOPE
         );
 
-        /**
-         * @brief Cached pointer to the currently bound OpenGL mesh component.
-         */
-        OpenGLMeshComponent<MeshHandle>* currentOpenGLMesh_ = nullptr;
+
+        types::OpenGLRenderTargetData currentRenderTargetData_ = {};
+        types::OpenGLShaderData currentShaderData_ = {};
+        types::OpenGLMeshData currentMeshData_ = {};
 
         /**
          * @brief Cached pass-scope uniforms (typically view/projection).
@@ -120,120 +103,20 @@ export namespace helios::opengl {
         UniformValueBag<UniformScope::Material> materialUniformValueBag_{};
 
         /**
-         * @brief Currently active render target for nested viewport processing.
-         */
-        RenderTargetHandle currentRenderTargetHandle_{};
-
-        /**
-         * @brief Currently bound shader to avoid redundant `glUseProgram` calls.
-         */
-        ShaderHandle currentShaderHandle_{};
-
-
-        /**
-         * @brief Engine world used to resolve render entities and components.
-         */
-        ecs::EcsWorld& ecsWorld_;
-
-        /**
-         * @brief Per-viewport camera matrices used for a render pass.
-         */
-        struct ViewProjection {
-            helios::math::mat4f viewMatrix;
-            helios::math::mat4f projectionMatrix;
-        };
-
-        /**
-         * @brief Resolves view and projection matrices for a viewport's bound camera.
-         *
-         * @param viewportEntity Viewport entity used to resolve camera bindings.
-         * @return View/projection pair on success, otherwise `std::nullopt`.
-         */
-        [[nodiscard]] std::optional<ViewProjection> viewProjection(const ViewportEntity& viewportEntity) const noexcept {
-
-            auto* cbc = viewportEntity.get<CameraBindingComponent<ViewportHandle>>();
-            if (!cbc) {
-                logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
-                return std::nullopt;
-            }
-            auto camera = ecsWorld_.find(cbc->targetHandle());
-            if (!camera) {
-                logger_.error("Expected CameraEntity, but couldn't find any.");
-                return std::nullopt;
-            }
-            using CameraHandleType = std::remove_cvref_t<decltype(cbc->targetHandle())>;
-            auto* vm = camera->template get<ViewMatrixComponent<CameraHandleType>>();
-            if (!vm) {
-                logger_.error("Expected ViewMatrixComponent, but couldn't find any.");
-                return std::nullopt;
-            }
-
-            auto* pm = camera->template get<ProjectionMatrixComponent<CameraHandleType>>();
-            if (!pm) {
-                logger_.error("Expected ProjectionMatrixComponent, but couldn't find any.");
-                return std::nullopt;
-            }
-
-            return ViewProjection{
-                vm->value(), pm->value()
-            };
-
-        }
-
-        /**
-         * @brief Uploads cached uniform values for a specific uniform scope.
-         *
-         * @details Resolves `OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>`
-         * on the shader entity and forwards its operation list plus values from
-         * `UniformValueBag` to `OpenGLUniformWriter`. If no write-plan component
-         * exists, the method logs an error and asserts in debug builds.
-         *
-         * @tparam TUniformScope Uniform lifetime scope (for example pass or draw).
-         * @param shaderEntity Shader entity holding location cache and shader data.
-         * @param uniformValueBag Source values to upload for this scope.
-         */
-        template<typename TUniformScope>
-        void writeUniformValues(ShaderEntity shaderEntity, UniformValueBag<TUniformScope>& uniformValueBag) noexcept {
-
-            auto* ulc = shaderEntity.get<OpenGLUniformWriteOperationsComponent<ShaderHandle, TUniformScope>>();
-
-            if (!ulc) {
-                logger_.error("OpenGLUniformWriteOperationsComponent<{0}> expected, but not found", typeid(TUniformScope).name());
-                assert(false && "OpenGLUniformWriteOperationsComponent not found");
-                return;
-            }
-
-            OpenGLUniformWriter::write(ulc->operations, uniformValueBag);
-        }
-
-
-        /**
          * @brief Applies clear color and clear mask based on optional components.
-         *
-         * @tparam THandle Handle type used for component lookup.
-         * @tparam TEntity Entity wrapper type exposing `get<...>()`.
-         * @param entity Entity to query for `ColorComponent` and `ClearComponent`.
          */
-        template<typename THandle, typename TEntity>
-        void clearColor(TEntity& entity) noexcept {
+        void clearColor(const types::OpenGLClearColorData& clearColorData) noexcept {
 
-            auto* colorComp = entity->template get<ColorComponent<THandle>>();
-            auto* clearComp = entity->template get<ClearComponent<THandle>>();
+            const auto clearColor = clearColorData.color;
+            glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
 
-            if (colorComp) {
-                const auto clearColor = colorComp->value();
-                glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-            }
+            const auto clearFlags = clearColorData.clearFlags;
+            const auto clearMask = ((clearFlags & std::to_underlying(ClearFlags::Color)) ? GL_COLOR_BUFFER_BIT : 0) |
+               ((clearFlags & std::to_underlying(ClearFlags::Depth)) ? GL_DEPTH_BUFFER_BIT : 0) |
+               ((clearFlags & std::to_underlying(ClearFlags::Stencil)) ? GL_STENCIL_BUFFER_BIT : 0);
 
-            if (clearComp) {
-                const auto clearFlags = std::to_underlying(clearComp->flags);
-                const auto clearMask = ((clearFlags & std::to_underlying(ClearFlags::Color)) ? GL_COLOR_BUFFER_BIT : 0) |
-                   ((clearFlags & std::to_underlying(ClearFlags::Depth)) ? GL_DEPTH_BUFFER_BIT : 0) |
-                   ((clearFlags & std::to_underlying(ClearFlags::Stencil)) ? GL_STENCIL_BUFFER_BIT : 0);
-
-                if (clearMask != 0) {
-                    glClear(clearMask);
-                }
+            if (clearMask != 0) {
+                glClear(clearMask);
             }
         }
 
@@ -241,37 +124,16 @@ export namespace helios::opengl {
     public:
 
 
-
-        /**
-         * @brief Constructs the backend bound to the engine world.
-         *
-         * @param ecsWorld Engine world providing render resources and targets.
-         */
-        explicit OpenGLBackend(ecs::EcsWorld& ecsWorld) : ecsWorld_(ecsWorld) {}
-
-
         /**
          * @brief Begins processing for one render-target batch.
          *
-         * @details Binds the framebuffer, validates it in debug builds, and initializes
-         * pass-independent GL state such as blending and clear color.
-         *
-         * @param renderTargetHandle Render-target handle for this batch.
+         * @param renderTargetData
          */
-        void beginRenderTargetBatch(const RenderTargetHandle renderTargetHandle) noexcept {
+        void beginRenderTargetBatch(const types::OpenGLRenderTargetData& renderTargetData) noexcept {
 
-            auto renderTargetEntity = ecsWorld_.template find<RenderTargetHandle>(renderTargetHandle);
+            currentRenderTargetData_ = renderTargetData;
 
-            #ifdef HELIOS_DEBUG
-            if (!renderTargetEntity) {
-                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetHandle.entityId());
-                assert(renderTargetEntity && "Missing RenderTargetEntity for handle.");
-            }
-            #endif
-
-            currentRenderTargetHandle_ = renderTargetHandle;
-
-            const auto renderTargetId = renderTargetEntity->template get<OpenGLRenderTargetIdComponent<RenderTargetHandle>>()->value();
+            const auto renderTargetId = renderTargetData.renderTargetId;
 
             glBindFramebuffer(GL_FRAMEBUFFER, renderTargetId);
 
@@ -284,14 +146,14 @@ export namespace helios::opengl {
             }
             #endif
 
-            auto renderTargetSize = renderTargetEntity->template get<Size2DComponent<RenderTargetHandle>>()->value();
+            auto renderTargetSize = renderTargetData.renderTargetSize;
 
             glViewport(0, 0,
                 static_cast<int>(renderTargetSize[0]),
                 static_cast<int>(renderTargetSize[1])
             );
 
-            clearColor<RenderTargetHandle>(renderTargetEntity);
+            clearColor(renderTargetData.clearColorData);
 
             // this is equally important for the GlpyhTextRenderer
             // enable blending since the font's fragment shader uses the alpha channel
@@ -301,42 +163,21 @@ export namespace helios::opengl {
 
         /**
          * @brief Ends processing for one render-target batch.
-         *
-         * @details Clears current render-target state and resets cached pass/draw uniform values.
-         *
-         * @param renderTargetHandle Render-target handle for this batch.
          */
-        void endRenderTargetBatch(const RenderTargetHandle renderTargetHandle) noexcept {
-
-            currentRenderTargetHandle_ = RenderTargetHandle{};
+        void endRenderTargetBatch() noexcept {
+            currentRenderTargetData_ = types::OpenGLRenderTargetData{};
             passUniformValueBag_.clearValues();
         }
 
         /**
          * @brief Begins processing for one viewport batch.
          *
-         * @details Resolves camera matrices, configures viewport/scissor rectangles, and performs
-         * optional clears according to the active render target clear flags.
-         *
-         * @param viewportHandle Viewport handle for this batch.
+         * @param viewportData
          */
-        void beginViewportBatch(const ViewportHandle viewportHandle) noexcept {
+        void beginViewportBatch(const types::OpenGLViewportData& viewportData) noexcept {
 
-            auto viewport = ecsWorld_.template find<ViewportHandle>(viewportHandle);
-            auto renderTargetEntity = ecsWorld_.template find<RenderTargetHandle>(currentRenderTargetHandle_);
 
-            #ifdef HELIOS_DEBUG
-            if (!renderTargetEntity) {
-                logger_.error("Missing RenderTargetEntity for handle {0}.", renderTargetEntity->handle().entityId());
-                assert(renderTargetEntity && "Missing RenderTargetEntity for handle.");
-            }
-            if (!viewport) {
-                logger_.error("Missing Viewport for handle {0}.", viewportHandle.entityId());
-                assert(viewport && "Missing Viewport for handle.");
-            }
-            #endif
-
-            auto vp = viewProjection(*viewport);
+            auto vp = viewportData.viewProjectionData;
             if (!vp) {
                 logger_.warn("Could not determine View/Projection-matrices for RenderPass");
                 passUniformValueBag_.set<ProjectionMatrixUniform>(helios::math::mat4f{1.0f});
@@ -346,8 +187,8 @@ export namespace helios::opengl {
                 passUniformValueBag_.set<ViewMatrixUniform>(vp->viewMatrix);
             }
 
-            auto viewportBounds  = viewport->template get<RectComponent<ViewportHandle>>()->value();
-            auto renderTargetSize = renderTargetEntity->template get<Size2DComponent<RenderTargetHandle>>()->value();
+            auto viewportBounds  = viewportData.viewportBounds;
+            auto renderTargetSize = currentRenderTargetData_.renderTargetSize;
 
             const auto x = static_cast<int>(renderTargetSize[0] * viewportBounds[0]);
             const auto y = static_cast<int>(renderTargetSize[1] * viewportBounds[1]);
@@ -359,7 +200,7 @@ export namespace helios::opengl {
             glScissor(x, y, width, height);
             glEnable(GL_SCISSOR_TEST);
 
-            clearColor<ViewportHandle>(viewport);
+            clearColor(viewportData.clearColorData);
         }
 
         /**
@@ -367,115 +208,63 @@ export namespace helios::opengl {
          *
          * @param viewportHandle Viewport handle for this batch.
          */
-        void endViewportBatch(const ViewportHandle viewportHandle) noexcept {
+        void endViewportBatch() noexcept {
             glDisable(GL_SCISSOR_TEST);
         }
 
         /**
          * @brief Begins processing for one shader batch.
          *
-         * @details Binds the shader program and uploads pass-scope uniforms.
-         *
-         * @param shaderHandle Shader handle for this batch.
+         * @param shaderData
          */
-        void beginShaderBatch(ShaderHandle shaderHandle) noexcept {
+        void beginShaderBatch(const types::OpenGLShaderData& shaderData) noexcept {
 
-            auto shaderEntity = ecsWorld_.find(shaderHandle);
-            if (!shaderEntity) {
-                logger_.error("ShaderEntity expected, but not found");
-                assert(false && "ShaderEntity not found");
-                return;
-            }
+            currentShaderData_ = shaderData;
 
-            currentShaderHandle_ = shaderHandle;
+            glUseProgram(shaderData.programId);
 
-            auto* openglShader = shaderEntity->template get<OpenGLShaderComponent<ShaderHandle>>();
-            if (!openglShader) {
-                logger_.error("OpenGLShader expected, but not found");
-                assert(false && "OpenGLShader not found");
-                return;
-            }
-
-            glUseProgram(openglShader->programId);
-            writeUniformValues<UniformScope::Pass>(*shaderEntity, passUniformValueBag_);
+            OpenGLUniformWriter::write(shaderData.uniformWriteOperations, passUniformValueBag_);
         }
 
         /**
          * @brief Ends processing for one shader batch.
-         *
-         * @param handle Shader handle for this batch.
          */
-        void endShaderBatch(ShaderHandle handle) noexcept {
-            currentShaderHandle_ = ShaderHandle{};
+        void endShaderBatch() noexcept {
+            currentShaderData_ = types::OpenGLShaderData{};
         }
 
         /**
          * @brief Begins processing for one texture batch.
          *
-         * @param textureHandle Texture handle for this batch.
+         * @param textureData
          */
-        void beginTextureBatch(TextureHandle textureHandle) noexcept {
-
-
-            auto textureEntity = ecsWorld_.find(textureHandle);
-
-            if (!textureEntity) {
-                logger_.error("TextureEntity expected, but not found");
-                assert(false && "TextureEntity not found");
-                return;
-            }
-
-            auto* textureComponent = textureEntity->template get<OpenGLTextureComponent<TextureHandle>>();
-
-            if (!textureComponent) {
-                logger_.error("OpenGLTexture expected, but not found");
-                assert(false && "OpenGLTexture not found");
-                return;
-            }
-
-            glBindTexture(GL_TEXTURE_2D, textureComponent->textureId);
+        void beginTextureBatch(const types::OpenGLTextureData& textureData) noexcept {
+            glBindTexture(GL_TEXTURE_2D, textureData.textureId);
         }
 
         /**
          * @brief Ends the texture batch und unbinds the current texture.
-         *
-         * @param handle Texture handle for this batch.
          */
-        void endTextureBatch(TextureHandle handle) noexcept {
+        void endTextureBatch() noexcept {
             glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         /**
          * @brief Begins processing for one material batch.
          *
-         * @details Loads material-scope values (for example base color) into draw-scope uniforms.
-         *
-         * @param materialHandle Material handle for this batch.
+         * @param materialData
          */
-        void beginMaterialBatch(MaterialHandle materialHandle) noexcept {
-            auto materialEntity = ecsWorld_.find(materialHandle);
-            if (!materialEntity) {
-                logger_.error("MaterialEntity expected, but not found");
-                assert(false && "MaterialEntity not found");
-                return;
+        void beginMaterialBatch(const types::OpenGLMaterialData& materialData) noexcept {
+            if (materialData.baseColor) {
+                materialUniformValueBag_.set<MaterialBaseColorUniform>(*materialData.baseColor);
+                OpenGLUniformWriter::write(currentShaderData_.uniformWriteOperations, materialUniformValueBag_);
             }
-
-            auto* colorComponent = materialEntity->template get<ColorComponent<MaterialHandle>>();
-            if (colorComponent) {
-                materialUniformValueBag_.set<MaterialBaseColorUniform>(colorComponent->value());
-                const auto shaderEntity = ecsWorld_.find(currentShaderHandle_);
-                assert(shaderEntity && "ShaderEntity expected, but not found");
-                writeUniformValues<UniformScope::Material>(*shaderEntity, materialUniformValueBag_);
-            }
-
         }
 
         /**
          * @brief Ends processing for one material batch.
-         *
-         * @param handle Material handle for this batch.
          */
-        void endMaterialBatch(MaterialHandle handle) noexcept {
+        void endMaterialBatch() noexcept {
             materialUniformValueBag_.clearValues();
         }
 
@@ -484,35 +273,18 @@ export namespace helios::opengl {
          *
          * @details Resolves and binds the mesh VAO used for all draw contexts in the batch.
          *
-         * @param meshHandle Mesh handle for this batch.
+         * @param meshData
          */
-        void beginMeshBatch(MeshHandle meshHandle) noexcept {
-
-            auto meshEntity = ecsWorld_.find(meshHandle);
-            if (!meshEntity) {
-                logger_.error("MeshEntity expected, but not found");
-                assert(false && "MeshEntity not found");
-                return;
-            }
-
-            auto* openglMesh = meshEntity->template get<OpenGLMeshComponent<MeshHandle>>();
-            if (!openglMesh) {
-                logger_.error("OpenGLMesh expected, but not found");
-                assert(false && "OpenGLMesh not found");
-                return;
-            } else {
-                currentOpenGLMesh_ = openglMesh;
-                glBindVertexArray(openglMesh->vao);
-            }
+        void beginMeshBatch(const types::OpenGLMeshData& meshData) noexcept {
+            currentMeshData_ = meshData;
+            glBindVertexArray(meshData.vao);
         }
 
         /**
          * @brief Ends processing for one mesh batch.
-         *
-         * @param handle Mesh handle for this batch.
          */
-        void endMeshBatch(MeshHandle handle) noexcept {
-            currentOpenGLMesh_ = nullptr;
+        void endMeshBatch() noexcept {
+            currentMeshData_ = types::OpenGLMeshData{};
             glBindVertexArray(0);
         }
 
@@ -528,27 +300,14 @@ export namespace helios::opengl {
          */
         void renderBatch(const std::span<const DrawContext> sceneMemberRenderContexts) noexcept {
 
-            if (!currentOpenGLMesh_) {
-                logger_.error("OpenGLMesh expected, but not available");
-                return;
-            }
-            if (!currentShaderHandle_.isValid()) {
-                logger_.error("Expected valid currentShaderHandle_, but found {0}.", currentShaderHandle_.entityId());
-                return;
-            }
-
-            const auto shaderEntity = ecsWorld_.find(currentShaderHandle_);
-
-            assert(shaderEntity && "ShaderEntity expected, but not found");
-            assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
 
             for (auto& renderContext : sceneMemberRenderContexts) {
 
                 drawUniformValueBag_.set<ModelMatrixUniform>(renderContext.worldMatrix);
-                writeUniformValues<UniformScope::Draw>(*shaderEntity, drawUniformValueBag_);
+                OpenGLUniformWriter::write(currentShaderData_.uniformWriteOperations, drawUniformValueBag_);
                 glDrawElements(
-                    currentOpenGLMesh_->primitiveType,
-                    currentOpenGLMesh_->indexCount,
+                    currentMeshData_.primitiveType,
+                    currentMeshData_.indexCount,
                     GL_UNSIGNED_INT,
                     nullptr
                 );
@@ -568,13 +327,6 @@ export namespace helios::opengl {
          */
         void renderBatch(const std::span<const InstanceData> instanceData) const noexcept {
 
-            if (!currentOpenGLMesh_) {
-                logger_.error("OpenGLMesh expected, but not available");
-                return;
-            }
-
-            assert(currentOpenGLMesh_ && "Current OpenGL mesh expected, but not found");
-
             const auto instanceSize = instanceData.size();
 
             assert(instanceSize <= 1'000'000 && "Instance data size seems unreasonably large.");
@@ -583,8 +335,8 @@ export namespace helios::opengl {
                 return;
             }
 
-            assert(currentOpenGLMesh_->instanceVbo && "Using instancing without configured instanceVbo");
-            glBindBuffer(GL_ARRAY_BUFFER, currentOpenGLMesh_->instanceVbo);
+            assert(currentMeshData_.instanceVbo && "Using instancing without configured instanceVbo");
+            glBindBuffer(GL_ARRAY_BUFFER, currentMeshData_.instanceVbo);
 
             glBufferData(
                 GL_ARRAY_BUFFER,
@@ -594,8 +346,8 @@ export namespace helios::opengl {
 
 
             glDrawElementsInstanced(
-                currentOpenGLMesh_->primitiveType,
-                currentOpenGLMesh_->indexCount,
+                currentMeshData_.primitiveType,
+                currentMeshData_.indexCount,
                 GL_UNSIGNED_INT,
                 nullptr,
                 instanceSize
@@ -610,12 +362,13 @@ export namespace helios::opengl {
          * @details The backend currently requests OpenGL 4.1 core profile for macOS
          * compatibility.
          */
-        void provideWindowHints() noexcept {
+        bool configureWindowCreationHints() noexcept {
 
             glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
             glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
             glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+            return true;
         }
 
         /**
@@ -625,7 +378,7 @@ export namespace helios::opengl {
          * @post `isInitialized()` returns `true` on success.
          * @return `true` if loading succeeded, otherwise `false`.
          */
-        [[nodiscard]] bool init() noexcept {
+        [[nodiscard]] bool finalizeSetup() noexcept {
 
             assert(!isInitialized_ && "Backend already initialized");
 
