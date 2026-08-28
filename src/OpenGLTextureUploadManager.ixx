@@ -52,10 +52,6 @@ export namespace helios::opengl {
     requires texture::concepts::IsTextureHandle<THandle>
     class OpenGLTextureUploadManager {
 
-        /**
-         * @brief Render-resource world used to resolve texture entities by handle.
-         */
-        EcsWorld& ecsWorld_;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
@@ -73,7 +69,8 @@ export namespace helios::opengl {
          *
          * @return `true` if upload succeeded, otherwise `false`.
          */
-        bool upload(texture::TextureEntity texture) noexcept requires std::same_as<THandle, typename texture::TextureEntity::Handle_type> {
+        bool upload(texture::TextureEntity texture, ImageReader& imageReader) noexcept
+        requires std::same_as<THandle, typename texture::TextureEntity::Handle_type> {
 
 
             logger_.info("Uploading texture data for MeshEntity {0}...", texture.handle().entityId());
@@ -95,7 +92,7 @@ export namespace helios::opengl {
 
             ImageData imageData{};
             logger_.info("Uploading {0}", textureSourceCmp->texturePath);
-            if (!imageReader_.readInto(textureSourceCmp->texturePath, imageData)) {
+            if (!imageReader.readInto(textureSourceCmp->texturePath, imageData)) {
                 assert(false && "Texture upload failed");
                 logger_.error("Texture upload failed.");
                 return false;
@@ -134,36 +131,24 @@ export namespace helios::opengl {
             return true;
         }
 
-        const ImageReader imageReader_;
-
         public:
 
-
-        /**
-         * @brief Constructs the manager with access to render-resource storage.
-         *
-         * @param ecsWorld Render-resource world used to resolve mesh entities.
-         * @param imageReader Image reader used to load texture data from disk.
-         */
-        explicit OpenGLTextureUploadManager(EcsWorld& ecsWorld, const ImageReader &imageReader)
-        :
-        ecsWorld_(ecsWorld),
-        imageReader_(imageReader)
-        { }
 
         /**
          * @brief Uploads all queued textures and clears processed texture entries.
          *
          * @param updateContext Frame-local update context.
          */
-        bool executeCommands()  noexcept {
+        bool executeCommands(EntityManager<THandle>& entityManager)  noexcept {
 
             if (textureHandles_.empty()) {
                 return true;
             }
 
+            ImageReader imageReader{};
+
             for (const auto& sourceHandle : textureHandles_) {
-                auto textureEntity = ecsWorld_.find<THandle>(sourceHandle);
+                auto textureEntity = entityManager.entity(sourceHandle);
 
                 if (!textureEntity) {
                     logger_.error("Could not find texture entity");
@@ -174,7 +159,7 @@ export namespace helios::opengl {
                 /**
                  * @todo fallback texture?
                  */
-                if (!upload(*textureEntity)) {
+                if (!upload(*textureEntity, imageReader)) {
                     logger_.error("Could not upload texture");
                     assert(false && "Could not upload texture");
                 } else {
