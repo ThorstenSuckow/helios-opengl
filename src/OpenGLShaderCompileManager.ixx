@@ -31,6 +31,8 @@ import helios.engine.rendering.shader.NullUniformCacheStrategy;
 
 import helios.opengl.components.OpenGLShaderComponent;
 
+import helios.opengl.OpenGLUniformLocationCacheStrategy;
+
 import helios.ecs;
 import helios.engine.runtime.concepts;
 
@@ -54,35 +56,9 @@ export namespace helios::opengl {
      * @brief Manager that consumes shader compile commands and performs OpenGL compilation/linking.
      *
      * @tparam THandle Shader handle type.
-     * @tparam TUniformCacheStrategy Uniform cache strategy used after successful program linking.
      */
-    template<
-        typename TUniformCacheStrategy = NullUniformCacheStrategy<ShaderHandle>
-    >
-    class OpenGLShaderCompileManager;
-    
-    template<
-        template<typename> typename TUniformCacheStrategy,
-        typename THandle
-    >
-    requires IsShaderHandle<THandle> &&
-        IsUniformCacheStrategyLike<
-            TUniformCacheStrategy<THandle>, THandle, UniformScope::Pass, UniformScope::Material, UniformScope::Draw
-        >
-    class OpenGLShaderCompileManager<TUniformCacheStrategy<THandle>>  {
-
-        using UniformCacheStrategyType = TUniformCacheStrategy<THandle>;
-        
-        
-        /**
-         * @brief File reader used to load shader source text from disk.
-         */
-        BasicStringFileReader stringFileReader_;
-
-        /**
-         * @brief Render-resource world used to resolve shader entities by handle.
-         */
-        ecs::EcsWorld& ecsWorld_;
+    template<typename THandle>
+    class OpenGLShaderCompileManager {
 
         /**
          * @brief Pending shader handles queued for compilation during `flush(...)`.
@@ -106,11 +82,6 @@ export namespace helios::opengl {
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
 
         /**
-         * @brief Uniform caching strategy executed after successful shader compilation.
-         */
-        UniformCacheStrategyType uniformCacheStrategy_;
-
-        /**
          * @brief Loads the specified vertex and fragment shader.
          *
          * @param vertexShaderPath Path to the vertex shader source file.
@@ -125,11 +96,12 @@ export namespace helios::opengl {
             const std::string& vertexShaderPath,
             const std::string& fragmentShaderPath,
             std::string& vertexShaderSource,
-            std::string& fragmentShaderSource
+            std::string& fragmentShaderSource,
+            BasicStringFileReader& fileReader
         ) noexcept {
 
-            const bool frag = stringFileReader_.readInto(fragmentShaderPath, fragmentShaderSource);
-            const bool vert = stringFileReader_.readInto(vertexShaderPath, vertexShaderSource);
+            const bool frag = fileReader.readInto(fragmentShaderPath, fragmentShaderSource);
+            const bool vert = fileReader.readInto(vertexShaderPath, vertexShaderSource);
 
             assert(frag && vert && "Could not load shader files");
 
@@ -145,7 +117,7 @@ export namespace helios::opengl {
          *
          * @note On compile/link errors, diagnostics are asserted/logged and `false` is returned.
          */
-        bool compile(ShaderEntity shader) noexcept {
+        bool compile(ShaderEntity shader, BasicStringFileReader& fileReader) noexcept {
 
             using Handle = typename ShaderEntity::Handle_type;
 
@@ -163,7 +135,7 @@ export namespace helios::opengl {
             const bool loaded = load(
                 shaderSourceComponent->vertexShaderPath,
                 shaderSourceComponent->fragmentShaderPath,
-                vertexShaderSource_, fragmentShaderSource_);
+                vertexShaderSource_, fragmentShaderSource_, fileReader);
 
             if (!loaded) {
                 logger_.error("Could not load shader files");
@@ -230,37 +202,20 @@ export namespace helios::opengl {
         public:
 
         /**
-         * @brief Constructs the manager with access to render-resource world storage.
-         *
-         * @param ecsWorld Render-resource world used to resolve shader entities.
-         * @param uniformCacheStrategy Strategy object used to cache pass/draw uniforms.
-         */
-        explicit OpenGLShaderCompileManager(
-            ecs::EcsWorld& ecsWorld,
-            UniformCacheStrategyType&& uniformCacheStrategy
-        )
-        : 
-        ecsWorld_(ecsWorld),
-        uniformCacheStrategy_(std::move(uniformCacheStrategy))
-        { }
-
-
-        /**
          * @brief Compiles all queued shaders and clears processed command data.
          *
-         * @details Handles are queued through consuming `submit(...)` overloads and
-         * processed in FIFO order for the current frame.
-         *
-         * @param updateContext Frame-local update context.
          */
-        bool executeCommands()  noexcept {
+        bool executeCommands(EntityManager<THandle>& entityManager)  noexcept {
 
             if (shaderHandles_.empty()) {
                 return true;
             }
 
+            BasicStringFileReader fileReader{};
+            OpenGLUniformLocationCacheStrategy<THandle> uniformCacheStrategy{};
+
             for (const auto& sourceHandle : shaderHandles_) {
-                auto shaderEntity = ecsWorld_.find<THandle>(sourceHandle);
+                auto shaderEntity = entityManager.entity(sourceHandle);
 
                 if (!shaderEntity) {
                     logger_.error("Could not find shader source");
@@ -268,17 +223,16 @@ export namespace helios::opengl {
                     return false;
                 }
 
-                if (!compile(*shaderEntity)) {
+                if (!compile(*shaderEntity, fileReader)) {
                     logger_.error("Could not compile shader");
                     assert(false && "Could not compile shader");
                     return false;
-                } else {
-                    shaderEntity->template remove<ShaderSourceComponent<THandle>>();
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), ecsWorld_);
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), ecsWorld_);
-                    std::ignore = uniformCacheStrategy_.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), ecsWorld_);
-
                 }
+
+                shaderEntity->template remove<ShaderSourceComponent<THandle>>();
+                std::ignore = uniformCacheStrategy.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), entityManager);
+                std::ignore = uniformCacheStrategy.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), entityManager);
+                std::ignore = uniformCacheStrategy.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), entityManager);
             }
 
             shaderHandles_.clear();
