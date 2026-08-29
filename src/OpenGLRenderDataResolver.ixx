@@ -73,7 +73,7 @@ export namespace helios::opengl {
         template<typename TEntity>
         [[nodiscard]] std::optional<types::OpenGLViewProjectionData> viewProjection(const TEntity& viewportEntity, ecs::EcsWorld& ecsWorld) const noexcept {
             auto* cbc = viewportEntity.template get<
-                engine::scene::components::CameraBindingComponent<typename TEntity::HandleType, CameraHandle>
+                engine::scene::components::CameraBindingComponent<typename TEntity::HandleType, TRenderHandles>
             >();
             if (!cbc) {
                 logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
