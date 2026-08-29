@@ -17,9 +17,6 @@ import helios.core.io;
 import helios.engine.rendering.common.types.Vertex;
 import helios.engine.rendering.texture.commands;
 import helios.engine.rendering.texture.components;
-import helios.engine.rendering.texture.TextureEntity;
-import helios.engine.rendering.texture.types;
-import helios.engine.rendering.texture.concepts;
 
 import helios.ecs;
 import helios.engine.runtime.concepts;
@@ -48,11 +45,12 @@ export namespace helios::opengl {
      * @tparam THandle Mesh handle type.
      * @tparam TCommandBuffer Command buffer type (kept for compatibility with runtime wiring).
      */
-    template<typename THandle = texture::types::TextureHandle>
-    requires texture::concepts::IsTextureHandle<THandle>
+    template<typename THandle>
     class OpenGLTextureUploadManager {
 
-
+        using TextureEntity = ecs::Entity<ecs::EntityManager<THandle>>;
+        
+        
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
          */
@@ -69,8 +67,8 @@ export namespace helios::opengl {
          *
          * @return `true` if upload succeeded, otherwise `false`.
          */
-        bool upload(texture::TextureEntity texture, ImageReader& imageReader) noexcept
-        requires std::same_as<THandle, typename texture::TextureEntity::Handle_type> {
+        bool upload(TextureEntity texture, ImageReader& imageReader) noexcept
+        requires std::same_as<THandle, typename TextureEntity::Handle_type> {
 
 
             logger_.info("Uploading texture data for MeshEntity {0}...", texture.handle().entityId());

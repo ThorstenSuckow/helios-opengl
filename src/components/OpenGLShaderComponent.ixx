@@ -6,9 +6,6 @@ module;
 
 export module helios.opengl.components.OpenGLShaderComponent;
 
-import helios.engine.rendering.shader.concepts.IsShaderHandle;
-
-using namespace helios::engine::rendering::shader::concepts;
 export namespace helios::opengl::components {
 
     /**
@@ -17,7 +14,6 @@ export namespace helios::opengl::components {
      * @tparam THandle Shader handle type.
      */
     template<typename THandle>
-    requires IsShaderHandle<THandle>
     struct OpenGLShaderComponent  {
 
         /** @brief Linked OpenGL program id. */

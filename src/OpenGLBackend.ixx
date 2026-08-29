@@ -20,9 +20,6 @@ import helios.math;
 
 import helios.core.log;
 
-import helios.engine.rendering.viewport.ViewportEntity;
-
-import helios.engine.rendering.renderTarget.RenderTargetEntity;
 import helios.engine.rendering.common.types;
 
 import helios.opengl.OpenGLUniformWriter;
@@ -30,10 +27,8 @@ import helios.opengl.types;
 
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
-import helios.engine.rendering.material;
 import helios.engine.rendering.texture;
 import helios.engine.rendering.renderTarget;
-import helios.engine.rendering.viewport;
 import helios.engine.util.Colors;
 
 import helios.engine.scene.components;
@@ -46,14 +41,10 @@ using namespace helios::engine::rendering::shader;
 using namespace helios::engine::rendering::shader::types;
 using namespace helios::opengl;
 using namespace helios::opengl::types;
-using namespace helios::engine::rendering::material::types;
-using namespace helios::engine::rendering::texture::types;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::engine::rendering::mesh::types;
 using namespace helios::engine::rendering::renderTarget;
 using namespace helios::engine::rendering::renderTarget::types;
-using namespace helios::engine::rendering::viewport;
-using namespace helios::engine::rendering::viewport::types;
 using namespace helios::engine::scene::types;
 using namespace helios::core::log;
 
@@ -298,7 +289,7 @@ export namespace helios::opengl {
          * @tparam THandle Scene member handle type contained in render contexts.
          * @param sceneMemberRenderContexts Non-instanced draw contexts.
          */
-        void renderBatch(const std::span<const DrawContext> sceneMemberRenderContexts) noexcept {
+        void renderBatch(const std::span<const DrawData> sceneMemberRenderContexts) noexcept {
 
 
             for (auto& renderContext : sceneMemberRenderContexts) {

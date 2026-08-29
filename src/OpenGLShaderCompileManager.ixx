@@ -23,9 +23,7 @@ import helios.core.io;
 import helios.engine.runtime.world;
 import helios.engine.rendering.shader.commands;
 import helios.engine.rendering.shader.components;
-import helios.engine.rendering.shader.ShaderEntity;
 import helios.engine.rendering.shader.types;
-import helios.engine.rendering.shader.concepts;
 import helios.engine.rendering.shader.commands;
 import helios.engine.rendering.shader.NullUniformCacheStrategy;
 
@@ -44,7 +42,6 @@ using namespace helios::engine::rendering::shader::commands;
 using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::shader;
 using namespace helios::engine::rendering::shader::types;
-using namespace helios::engine::rendering::shader::concepts;
 using namespace helios::engine::rendering::shader::commands;
 using namespace helios::opengl::components;
 using namespace helios::ecs::common::concepts;
@@ -60,10 +57,12 @@ export namespace helios::opengl {
     template<typename THandle>
     class OpenGLShaderCompileManager {
 
+        using ShaderEntity = ecs::Entity<ecs::EntityManager<THandle>>;
+
         /**
          * @brief Pending shader handles queued for compilation during `flush(...)`.
          */
-        std::vector<ShaderHandle> shaderHandles_;
+        std::vector<THandle> shaderHandles_;
 
         /**
          * @brief Reused storage for loaded vertex shader source.
@@ -187,7 +186,7 @@ export namespace helios::opengl {
                 return false;
             }
 
-            auto& shaderComponent = shader.add<OpenGLShaderComponent<THandle>>();
+            auto& shaderComponent = shader.template add<OpenGLShaderComponent<THandle>>();
             shaderComponent.programId = progId;
 
             glDeleteShader(vertexShader);

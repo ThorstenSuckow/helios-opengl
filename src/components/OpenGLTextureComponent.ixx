@@ -5,10 +5,6 @@
 module;
 
 export module helios.opengl.components.OpenGLTextureComponent;
-
-import helios.engine.rendering.texture.concepts;
-
-using namespace helios::engine::rendering::texture::concepts;
 export namespace helios::opengl::components {
 
     /**
@@ -16,8 +12,7 @@ export namespace helios::opengl::components {
      *
      * @tparam THandle Texture handle type.
      */
-    template<typename THandle>
-    requires IsTextureHandle<THandle>
+    template<typename TOwnerHandle>
     struct OpenGLTextureComponent  {
 
         /** @brief Linked OpenGL texture id. */

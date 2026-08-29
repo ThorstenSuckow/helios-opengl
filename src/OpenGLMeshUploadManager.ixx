@@ -23,9 +23,7 @@ import helios.core.io;
 import helios.engine.rendering.common.types.Vertex;
 import helios.engine.rendering.mesh.commands;
 import helios.engine.rendering.mesh.components;
-import helios.engine.rendering.mesh.MeshEntity;
 import helios.engine.rendering.mesh.types;
-import helios.engine.rendering.mesh.concepts;
 
 import helios.ecs;
 import helios.engine.runtime.concepts;
@@ -44,7 +42,6 @@ using namespace helios::engine::rendering::mesh::commands;
 using namespace helios::engine::rendering::mesh::components;
 using namespace helios::engine::rendering::mesh;
 using namespace helios::engine::rendering::mesh::types;
-using namespace helios::engine::rendering::mesh::concepts;
 using namespace helios::engine::rendering::mesh::commands;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::opengl;
@@ -60,14 +57,15 @@ export namespace helios::opengl {
      *
      * @tparam THandle Mesh handle type.
      */
-    template<typename THandle = MeshHandle>
-    requires IsMeshHandle<THandle>
+    template<typename THandle>
     class OpenGLMeshUploadManager {
+
+        using MeshEntity = ecs::Entity<ecs::EntityManager<THandle>>;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
          */
-        std::vector<MeshHandle> meshHandles_;
+        std::vector<THandle> meshHandles_;
 
 
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
@@ -222,7 +220,7 @@ export namespace helios::opengl {
                 mesh.template remove<VertexAttributeLayoutComponent<Handle, PerInstance>>();
             }
 
-            mesh.remove<MeshDataComponent<Handle>>();
+            mesh.template remove<MeshDataComponent<Handle>>();
 
 
             glBindVertexArray(0);

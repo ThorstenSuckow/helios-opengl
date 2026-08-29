@@ -13,7 +13,6 @@ export module helios.opengl.OpenGLUniformLocationCacheStrategy;
 import helios.engine.rendering.shader.components.UniformMappingsComponent;
 
 import helios.engine.runtime.world.UpdateContext;
-import helios.engine.rendering.shader.concepts.IsShaderHandle;
 import helios.engine.rendering.shader.types;
 
 import helios.ecs.EntityManager;
@@ -24,7 +23,6 @@ import helios.opengl.components.OpenGLUniformWriteOperationsComponent;
 import helios.opengl.components.OpenGLShaderComponent;
 
 using namespace helios::engine::runtime::world;
-using namespace helios::engine::rendering::shader::concepts;
 using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::shader::types;
 using namespace helios::core::log;
@@ -37,8 +35,7 @@ export namespace helios::opengl {
      * @brief Builds OpenGL uniform write-operation plans for one shader entity.
      * @tparam THandle Shader handle type.
      */
-    template<typename THandle = ShaderHandle>
-    requires IsShaderHandle<THandle>
+    template<typename THandle>
     class OpenGLUniformLocationCacheStrategy {
 
         static inline const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);

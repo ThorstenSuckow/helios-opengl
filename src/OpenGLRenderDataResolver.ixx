@@ -29,9 +29,19 @@ import helios.core.log;
 export namespace helios::opengl {
 
 
-    template<typename THandleList>
+    template<typename TRenderHandles>
     class OpenGLRenderDataResolver {
 
+    public:
+        using RenderTargetHandle = typename TRenderHandles::RenderTargetHandle;
+        using ViewportHandle = typename TRenderHandles::ViewportHandle;
+        using ShaderHandle = typename TRenderHandles::ShaderHandle;
+        using TextureHandle = typename TRenderHandles::TextureHandle;
+        using MaterialHandle = typename TRenderHandles::MaterialHandle;
+        using MeshHandle = typename TRenderHandles::MeshHandle;
+        using CameraHandle = typename TRenderHandles::CameraHandle;
+
+    private:
         template<typename THandle>
         using EntityManager = ecs::EntityManager<THandle>;
 
@@ -62,7 +72,9 @@ export namespace helios::opengl {
 
         template<typename TEntity>
         [[nodiscard]] std::optional<types::OpenGLViewProjectionData> viewProjection(const TEntity& viewportEntity, ecs::EcsWorld& ecsWorld) const noexcept {
-            auto* cbc = viewportEntity.template get<engine::scene::components::CameraBindingComponent<typename TEntity::HandleType>>();
+            auto* cbc = viewportEntity.template get<
+                engine::scene::components::CameraBindingComponent<typename TEntity::HandleType, CameraHandle>
+            >();
             if (!cbc) {
                 logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
                 return std::nullopt;
@@ -72,14 +84,14 @@ export namespace helios::opengl {
                 logger_.error("Expected CameraEntity, but couldn't find any.");
                 return std::nullopt;
             }
-            using CameraHandleType = std::remove_cvref_t<decltype(cbc->targetHandle())>;
-            auto* vm = camera->template get<engine::scene::components::ViewMatrixComponent<CameraHandleType>>();
+            using CameraHandle = std::remove_cvref_t<decltype(cbc->targetHandle())>;
+            auto* vm = camera->template get<engine::scene::components::ViewMatrixComponent<CameraHandle>>();
             if (!vm) {
                 logger_.error("Expected ViewMatrixComponent, but couldn't find any.");
                 return std::nullopt;
             }
 
-            auto* pm = camera->template get<engine::scene::components::ProjectionMatrixComponent<CameraHandleType>>();
+            auto* pm = camera->template get<engine::scene::components::ProjectionMatrixComponent<CameraHandle>>();
             if (!pm) {
                 logger_.error("Expected ProjectionMatrixComponent, but couldn't find any.");
                 return std::nullopt;
@@ -92,17 +104,8 @@ export namespace helios::opengl {
 
     public:
 
-        using RenderTargetHandleType = typename THandleList::RenderTargetHandleType;
-        using ViewportHandleType = typename THandleList::ViewportHandleType;
-        using ShaderHandleType = typename THandleList::ShaderHandleType;
-        using TextureHandleType = typename THandleList::TextureHandleType;
-        using MaterialHandleType = typename THandleList::MaterialHandleType;
-        using MeshHandleType = typename THandleList::MeshHandleType;
-
-
-
         [[nodiscard]] std::optional<types::OpenGLRenderTargetData> resolveRenderTargetData(
-            EntityManager<RenderTargetHandleType>& entityManager, const RenderTargetHandleType renderTargetHandle) noexcept {
+            EntityManager<RenderTargetHandle>& entityManager, const RenderTargetHandle renderTargetHandle) noexcept {
 
             types::OpenGLRenderTargetData renderTargetData{};
 
@@ -114,22 +117,22 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto renderTargetSize = renderTargetEntity->template get<engine::spatial::components::Size2DComponent<RenderTargetHandleType>>()->value();
-            const auto renderTargetId = renderTargetEntity->template get<components::OpenGLRenderTargetIdComponent<RenderTargetHandleType>>()->value();
+            auto renderTargetSize = renderTargetEntity->template get<engine::spatial::components::Size2DComponent<RenderTargetHandle>>()->value();
+            const auto renderTargetId = renderTargetEntity->template get<components::OpenGLRenderTargetIdComponent<RenderTargetHandle>>()->value();
 
             renderTargetData.renderTargetId = renderTargetId;
             renderTargetData.renderTargetSize = {renderTargetSize[0], renderTargetSize[1]};
-            renderTargetData.clearColorData = clearColorData<RenderTargetHandleType>(renderTargetEntity);
+            renderTargetData.clearColorData = clearColorData<RenderTargetHandle>(renderTargetEntity);
 
             return renderTargetData;
         }
 
         [[nodiscard]] std::optional<types::OpenGLViewportData> resolveViewportData(
-            const ViewportHandleType viewportHandle, ecs::EcsWorld& ecsWorld) noexcept {
+            const ViewportHandle viewportHandle, ecs::EcsWorld& ecsWorld) noexcept {
 
             types::OpenGLViewportData viewportData{};
 
-            auto viewport = ecsWorld.find<ViewportHandleType>(viewportHandle);
+            auto viewport = ecsWorld.find<ViewportHandle>(viewportHandle);
 
             if (!viewport) {
                 logger_.error("Missing Viewport for handle {0}.", viewportHandle.entityId());
@@ -139,16 +142,16 @@ export namespace helios::opengl {
 
             viewportData.viewProjectionData = viewProjection(*viewport, ecsWorld);
 
-            auto bounds = viewport->template get<engine::spatial::components::RectComponent<ViewportHandleType>>()->value();
+            auto bounds = viewport->template get<engine::spatial::components::RectComponent<ViewportHandle>>()->value();
             viewportData.viewportBounds  = {bounds[0], bounds[1], bounds[2], bounds[3]};
 
-            viewportData.clearColorData = clearColorData<ViewportHandleType>(viewport);
+            viewportData.clearColorData = clearColorData<ViewportHandle>(viewport);
 
             return viewportData;
         }
 
         [[nodiscard]] std::optional<types::OpenGLShaderData> resolveShaderData(
-            const ShaderHandleType shaderHandle, EntityManager<ShaderHandleType>& entityManager) noexcept {
+            const ShaderHandle shaderHandle, EntityManager<ShaderHandle>& entityManager) noexcept {
 
             types::OpenGLShaderData shaderData{};
 
@@ -159,7 +162,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto* openglShader = shaderEntity->template get<components::OpenGLShaderComponent<ShaderHandleType>>();
+            auto* openglShader = shaderEntity->template get<components::OpenGLShaderComponent<ShaderHandle>>();
             if (!openglShader) {
                 logger_.error("OpenGLShader expected, but not found");
                 assert(false && "OpenGLShader not found");
@@ -171,7 +174,7 @@ export namespace helios::opengl {
             using UniformScope =engine::rendering::shader::types::UniformScope::Pass;
 
             auto* ulc = shaderEntity->template get<components::OpenGLUniformWriteOperationsComponent<
-                ShaderHandleType, UniformScope>>();
+                ShaderHandle, UniformScope>>();
 
             if (!ulc) {
                 logger_.error("OpenGLUniformWriteOperationsComponent<{0}> expected, but not found", typeid(UniformScope).name());
@@ -185,7 +188,7 @@ export namespace helios::opengl {
         }
 
         [[nodiscard]] std::optional<types::OpenGLTextureData> resolveTextureData(
-            const TextureHandleType textureHandle, EntityManager<TextureHandleType>& entityManager) noexcept {
+            const TextureHandle textureHandle, EntityManager<TextureHandle>& entityManager) noexcept {
 
             types::OpenGLTextureData textureData{};
 
@@ -196,7 +199,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto* openglTexture = textureEntity->template get<components::OpenGLTextureComponent<TextureHandleType>>();
+            auto* openglTexture = textureEntity->template get<components::OpenGLTextureComponent<TextureHandle>>();
             if (!openglTexture) {
                 logger_.error("OpenGLTexture expected, but not found");
                 assert(false && "OpenGLTexture not found");
@@ -210,7 +213,7 @@ export namespace helios::opengl {
 
 
         [[nodiscard]] std::optional<types::OpenGLMaterialData> resolveMaterialData(
-            const MaterialHandleType materialHandle, EntityManager<MaterialHandleType>& entityManager) noexcept {
+            const MaterialHandle materialHandle, EntityManager<MaterialHandle>& entityManager) noexcept {
 
             types::OpenGLMaterialData materialData{};
 
@@ -221,7 +224,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            if (auto* colorComponent = materialEntity->template get<engine::core::components::ColorComponent<MaterialHandleType>>()) {
+            if (auto* colorComponent = materialEntity->template get<engine::core::components::ColorComponent<MaterialHandle>>()) {
                 materialData.baseColor = colorComponent->value();
             }
 
@@ -230,7 +233,7 @@ export namespace helios::opengl {
 
 
         [[nodiscard]] std::optional<types::OpenGLMeshData> resolveMeshData(
-            const MeshHandleType meshHandle, EntityManager<MeshHandleType>& entityManager) noexcept {
+            const MeshHandle meshHandle, EntityManager<MeshHandle>& entityManager) noexcept {
 
             types::OpenGLMeshData meshData{};
 
@@ -241,7 +244,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto* openglMesh = meshEntity->template get<components::OpenGLMeshComponent<MeshHandleType>>();
+            auto* openglMesh = meshEntity->template get<components::OpenGLMeshComponent<MeshHandle>>();
             if (!openglMesh) {
                 logger_.error("OpenGLMesh expected, but not found");
                 assert(false && "OpenGLMesh not found");
