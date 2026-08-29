@@ -214,7 +214,7 @@ export namespace helios::opengl {
 
             glUseProgram(shaderData.programId);
 
-            OpenGLUniformWriter::write(shaderData.uniformWriteOperations, passUniformValueBag_);
+            OpenGLUniformWriter::write(currentShaderData_.passWriteOperations, passUniformValueBag_);
         }
 
         /**
@@ -248,7 +248,7 @@ export namespace helios::opengl {
         void beginMaterialBatch(const types::OpenGLMaterialData& materialData) noexcept {
             if (materialData.baseColor) {
                 materialUniformValueBag_.set<MaterialBaseColorUniform>(*materialData.baseColor);
-                OpenGLUniformWriter::write(currentShaderData_.uniformWriteOperations, materialUniformValueBag_);
+                OpenGLUniformWriter::write(currentShaderData_.materialWriteOperations, materialUniformValueBag_);
             }
         }
 
@@ -295,7 +295,7 @@ export namespace helios::opengl {
             for (auto& renderContext : sceneMemberRenderContexts) {
 
                 drawUniformValueBag_.set<ModelMatrixUniform>(renderContext.worldMatrix);
-                OpenGLUniformWriter::write(currentShaderData_.uniformWriteOperations, drawUniformValueBag_);
+                OpenGLUniformWriter::write(currentShaderData_.drawWriteOperations, drawUniformValueBag_);
                 glDrawElements(
                     currentMeshData_.primitiveType,
                     currentMeshData_.indexCount,

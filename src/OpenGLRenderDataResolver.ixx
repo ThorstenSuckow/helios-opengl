@@ -171,18 +171,29 @@ export namespace helios::opengl {
 
             shaderData.programId = openglShader->programId;
 
-            using UniformScope =engine::rendering::shader::types::UniformScope::Pass;
+            using PassScope =engine::rendering::shader::types::UniformScope::Pass;
+            using MaterialScope =engine::rendering::shader::types::UniformScope::Material;
+            using DrawScope =engine::rendering::shader::types::UniformScope::Draw;
 
-            auto* ulc = shaderEntity->template get<components::OpenGLUniformWriteOperationsComponent<
-                ShaderHandle, UniformScope>>();
+            auto* ulcUniform = shaderEntity->template get<
+                components::OpenGLUniformWriteOperationsComponent<ShaderHandle, PassScope>>();
 
-            if (!ulc) {
-                logger_.error("OpenGLUniformWriteOperationsComponent<{0}> expected, but not found", typeid(UniformScope).name());
-                assert(false && "OpenGLUniformWriteOperationsComponent not found");
-                return std::nullopt;
-            }
+            auto* ulcMaterial = shaderEntity->template get<
+               components::OpenGLUniformWriteOperationsComponent<ShaderHandle, MaterialScope>>();
 
-            shaderData.uniformWriteOperations = ulc->operations;
+            auto* ulcDraw = shaderEntity->template get<
+               components::OpenGLUniformWriteOperationsComponent<ShaderHandle, DrawScope>>();
+
+             if (!ulcUniform || !ulcMaterial || !ulcDraw) {
+                 logger_.error("Pass/material/draw scope missing.");
+                 assert(false && "Pass/material/draw scope missing");
+                 return std::nullopt;
+             }
+
+            shaderData.passWriteOperations = ulcUniform->operations;
+            shaderData.materialWriteOperations = ulcMaterial->operations;
+            shaderData.drawWriteOperations = ulcDraw->operations;
+
 
             return shaderData;
         }
