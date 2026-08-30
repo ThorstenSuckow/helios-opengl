@@ -19,14 +19,11 @@ import helios.engine.rendering.texture.commands;
 import helios.engine.rendering.texture.components;
 
 import helios.ecs;
-import helios.engine.runtime.concepts;
 
-import helios.engine.runtime.world;
 
 import helios.opengl.components;
 
 using namespace helios::core::io;
-using namespace helios::engine::runtime::world;
 using namespace helios::core::log;
 using namespace helios::core::io;
 

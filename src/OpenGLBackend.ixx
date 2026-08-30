@@ -28,8 +28,6 @@ import helios.opengl.types;
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
 import helios.engine.rendering.texture;
-import helios.engine.rendering.renderTarget;
-import helios.engine.util.Colors;
 
 import helios.engine.scene.components;
 import helios.engine.scene.types;
@@ -43,8 +41,6 @@ using namespace helios::opengl;
 using namespace helios::opengl::types;
 using namespace helios::engine::rendering::common::types;
 using namespace helios::engine::rendering::mesh::types;
-using namespace helios::engine::rendering::renderTarget;
-using namespace helios::engine::rendering::renderTarget::types;
 using namespace helios::engine::scene::types;
 using namespace helios::core::log;
 

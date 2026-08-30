@@ -19,8 +19,6 @@ export module helios.opengl.OpenGLShaderCompileManager;
 
 import helios.core.log;
 import helios.core.io;
-
-import helios.engine.runtime.world;
 import helios.engine.rendering.shader.commands;
 import helios.engine.rendering.shader.components;
 import helios.engine.rendering.shader.types;
@@ -32,9 +30,8 @@ import helios.opengl.components.OpenGLShaderComponent;
 import helios.opengl.OpenGLUniformLocationCacheStrategy;
 
 import helios.ecs;
-import helios.engine.runtime.concepts;
 
-using namespace helios::engine::runtime::world;
+
 using namespace helios::core::log;
 using namespace helios::core::io;
 

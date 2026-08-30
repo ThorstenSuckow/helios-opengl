@@ -12,7 +12,7 @@ export module helios.opengl.OpenGLUniformLocationCacheStrategy;
 
 import helios.engine.rendering.shader.components.UniformMappingsComponent;
 
-import helios.engine.runtime.world.UpdateContext;
+import helios.engine.runtime.gameloop.types;
 import helios.engine.rendering.shader.types;
 
 import helios.ecs.EntityManager;
@@ -22,7 +22,7 @@ import helios.core.log;
 import helios.opengl.components.OpenGLUniformWriteOperationsComponent;
 import helios.opengl.components.OpenGLShaderComponent;
 
-using namespace helios::engine::runtime::world;
+
 using namespace helios::engine::rendering::shader::components;
 using namespace helios::engine::rendering::shader::types;
 using namespace helios::core::log;
@@ -39,6 +39,7 @@ export namespace helios::opengl {
     class OpenGLUniformLocationCacheStrategy {
 
         static inline const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
+        using UpdateContext = helios::engine::runtime::gameloop::types::UpdateContext;
 
     public:
 

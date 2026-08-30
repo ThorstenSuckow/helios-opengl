@@ -26,15 +26,12 @@ import helios.engine.rendering.mesh.components;
 import helios.engine.rendering.mesh.types;
 
 import helios.ecs;
-import helios.engine.runtime.concepts;
 
-import helios.engine.runtime.world;
 
 
 import helios.opengl.components.OpenGLMeshComponent;
 import helios.opengl.OpenGLEnumMapper;
 
-using namespace helios::engine::runtime::world;
 using namespace helios::core::log;
 using namespace helios::core::io;
 
