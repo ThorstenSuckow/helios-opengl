@@ -185,14 +185,17 @@ export namespace helios::opengl {
                components::OpenGLUniformWriteOperationsComponent<ShaderHandle, DrawScope>>();
 
              if (!ulcUniform || !ulcMaterial || !ulcDraw) {
-                 logger_.error("Pass/material/draw scope missing.");
-                 assert(false && "Pass/material/draw scope missing");
-                 return std::nullopt;
+                 logger_.warn("Pass/material/draw scope missing.");
              }
-
-            shaderData.passWriteOperations = ulcUniform->operations;
-            shaderData.materialWriteOperations = ulcMaterial->operations;
-            shaderData.drawWriteOperations = ulcDraw->operations;
+            if (ulcUniform) {
+                shaderData.passWriteOperations = ulcUniform->operations;
+            }
+            if (ulcMaterial) {
+                shaderData.materialWriteOperations = ulcMaterial->operations;
+            }
+            if (ulcDraw) {
+                shaderData.drawWriteOperations = ulcDraw->operations;
+            }
 
 
             return shaderData;

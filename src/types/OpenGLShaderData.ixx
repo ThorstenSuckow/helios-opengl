@@ -19,9 +19,9 @@ export namespace helios::opengl::types {
 
         std::uint32_t programId = 0;
 
-        std::vector<OpenGLUniformWriteOperation> passWriteOperations;
-        std::vector<OpenGLUniformWriteOperation> materialWriteOperations;
-        std::vector<OpenGLUniformWriteOperation> drawWriteOperations;
+        std::vector<OpenGLUniformWriteOperation> passWriteOperations{};
+        std::vector<OpenGLUniformWriteOperation> materialWriteOperations{};
+        std::vector<OpenGLUniformWriteOperation> drawWriteOperations{};
 
     };
 
