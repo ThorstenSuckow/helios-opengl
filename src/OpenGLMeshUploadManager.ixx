@@ -57,7 +57,7 @@ export namespace helios::opengl {
     template<typename THandle>
     class OpenGLMeshUploadManager {
 
-        using MeshEntity = ecs::Entity<ecs::EntityManager<THandle>>;
+        using MeshEntity = ecs::entity::Entity<ecs::entity::EntityManager<THandle>>;
 
         /**
          * @brief Pending mesh handles queued for upload during `flush(...)`.
@@ -233,7 +233,7 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        bool executeCommands(EntityManager<THandle>& entityManager)  noexcept {
+        bool executeCommands(entity::EntityManager<THandle>& entityManager)  noexcept {
 
             if (meshHandles_.empty()) {
                 return true;

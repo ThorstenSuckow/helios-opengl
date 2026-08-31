@@ -45,7 +45,7 @@ export namespace helios::opengl {
     template<typename THandle>
     class OpenGLTextureUploadManager {
 
-        using TextureEntity = ecs::Entity<ecs::EntityManager<THandle>>;
+        using TextureEntity = ecs::entity::Entity<ecs::entity::EntityManager<THandle>>;
         
         
         /**
@@ -134,7 +134,7 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        bool executeCommands(EntityManager<THandle>& entityManager)  noexcept {
+        bool executeCommands(entity::EntityManager<THandle>& entityManager)  noexcept {
 
             if (textureHandles_.empty()) {
                 return true;

@@ -43,7 +43,7 @@ export namespace helios::opengl {
 
     private:
         template<typename THandle>
-        using EntityManager = ecs::EntityManager<THandle>;
+        using EntityManager = ecs::entity::EntityManager<THandle>;
 
         inline static const core::log::Logger& logger_ = core::log::LogManager::loggerForScope(
             HELIOS_LOG_SCOPE
@@ -71,7 +71,7 @@ export namespace helios::opengl {
         }
 
         template<typename TEntity>
-        [[nodiscard]] std::optional<types::OpenGLViewProjectionData> viewProjection(const TEntity& viewportEntity, ecs::EcsWorld& ecsWorld) const noexcept {
+        [[nodiscard]] std::optional<types::OpenGLViewProjectionData> viewProjection(const TEntity& viewportEntity, ecs::entity::EntityWorld& ecsWorld) const noexcept {
             auto* cbc = viewportEntity.template get<
                 engine::scene::components::CameraBindingComponent<typename TEntity::HandleType, TRenderHandles>
             >();
@@ -128,7 +128,7 @@ export namespace helios::opengl {
         }
 
         [[nodiscard]] std::optional<types::OpenGLViewportData> resolveViewportData(
-            const ViewportHandle viewportHandle, ecs::EcsWorld& ecsWorld) noexcept {
+            const ViewportHandle viewportHandle, ecs::entity::EntityWorld& ecsWorld) noexcept {
 
             types::OpenGLViewportData viewportData{};
 

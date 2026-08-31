@@ -54,7 +54,7 @@ export namespace helios::opengl {
     template<typename THandle>
     class OpenGLShaderCompileManager {
 
-        using ShaderEntity = ecs::Entity<ecs::EntityManager<THandle>>;
+        using ShaderEntity = ecs::entity::Entity<ecs::entity::EntityManager<THandle>>;
 
         /**
          * @brief Pending shader handles queued for compilation during `flush(...)`.
@@ -201,7 +201,7 @@ export namespace helios::opengl {
          * @brief Compiles all queued shaders and clears processed command data.
          *
          */
-        bool executeCommands(EntityManager<THandle>& entityManager)  noexcept {
+        bool executeCommands(entity::EntityManager<THandle>& entityManager)  noexcept {
 
             if (shaderHandles_.empty()) {
                 return true;

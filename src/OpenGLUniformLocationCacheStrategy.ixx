@@ -15,7 +15,7 @@ import helios.engine.rendering.shader.components.UniformMappingsComponent;
 import helios.engine.runtime.gameloop.types;
 import helios.engine.rendering.shader.types;
 
-import helios.ecs.EntityManager;
+import helios.ecs.entity.EntityManager;
 
 import helios.core.log;
 
@@ -58,7 +58,7 @@ export namespace helios::opengl {
         template<typename TUniformScope>
         [[nodiscard]] bool cacheUniforms(
             THandle entityHandle,
-            ecs::EntityManager<THandle>& entityManager
+            ecs::entity::EntityManager<THandle>& entityManager
         ) noexcept {
             auto shaderEntity = entityManager.entity(entityHandle);
 
