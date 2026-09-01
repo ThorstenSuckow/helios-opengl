@@ -65,7 +65,7 @@ export namespace helios::opengl {
          * @return `true` if upload succeeded, otherwise `false`.
          */
         bool upload(TextureEntity texture, ImageReader& imageReader) noexcept
-        requires std::same_as<THandle, typename TextureEntity::Handle_type> {
+        requires std::same_as<THandle, typename TextureEntity::HandleType> {
 
 
             logger_.info("Uploading texture data for MeshEntity {0}...", texture.handle().entityId());

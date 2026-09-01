@@ -24,6 +24,9 @@ export namespace helios::opengl::components {
     template<typename THandle, typename TUniformScope>
     struct OpenGLUniformLocationComponent {
 
+
+        using HandleType = THandle;
+
         /**
          * @brief Number of supported uniform semantics.
          */

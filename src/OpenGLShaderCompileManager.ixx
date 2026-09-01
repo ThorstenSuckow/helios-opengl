@@ -115,7 +115,7 @@ export namespace helios::opengl {
          */
         bool compile(ShaderEntity shader, BasicStringFileReader& fileReader) noexcept {
 
-            using Handle = typename ShaderEntity::Handle_type;
+            using Handle = typename ShaderEntity::HandleType;
 
             logger_.info("Compiling shader...");
 

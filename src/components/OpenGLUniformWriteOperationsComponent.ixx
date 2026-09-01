@@ -24,6 +24,9 @@ export namespace helios::opengl::components {
     template<typename THandle, typename TUniformScope>
     struct OpenGLUniformWriteOperationsComponent {
 
+
+        using HandleType = THandle;
+
         /**
          * @brief Ordered uniform write operations with resolved locations.
          */

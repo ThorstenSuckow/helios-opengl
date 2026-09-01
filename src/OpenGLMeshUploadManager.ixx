@@ -150,7 +150,7 @@ export namespace helios::opengl {
          */
         bool upload(MeshEntity mesh) noexcept {
 
-            using Handle = typename MeshEntity::Handle_type;
+            using Handle = typename MeshEntity::HandleType;
 
             logger_.info("Uploading mesh data for MeshEntity {0}...", mesh.handle().entityId());
 
