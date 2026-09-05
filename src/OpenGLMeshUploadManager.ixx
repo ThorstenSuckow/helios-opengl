@@ -233,7 +233,7 @@ export namespace helios::opengl {
          *
          * @param updateContext Frame-local update context.
          */
-        bool executeCommands(entity::EntityManager<THandle>& entityManager)  noexcept {
+        bool commit(entity::EntityManager<THandle>& entityManager)  noexcept {
 
             if (meshHandles_.empty()) {
                 return true;

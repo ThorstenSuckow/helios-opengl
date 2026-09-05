@@ -201,7 +201,7 @@ export namespace helios::opengl {
          * @brief Compiles all queued shaders and clears processed command data.
          *
          */
-        bool executeCommands(entity::EntityManager<THandle>& entityManager)  noexcept {
+        bool commit(entity::EntityManager<THandle>& entityManager)  noexcept {
 
             if (shaderHandles_.empty()) {
                 return true;
