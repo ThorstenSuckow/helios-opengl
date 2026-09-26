@@ -21,11 +21,10 @@ export namespace helios::opengl::components {
      * @tparam THandle Owner handle type used by ECS composition.
      * @tparam TUniformScope Uniform lifetime scope tag (for example pass or draw scope).
      */
-    template<typename THandle, typename TUniformScope>
+    template<typename TUniformScope>
     struct OpenGLUniformWriteOperationsComponent {
 
 
-        using HandleType = THandle;
 
         /**
          * @brief Ordered uniform write operations with resolved locations.

@@ -13,11 +13,10 @@ import helios.opengl.types;
 
 export namespace helios::opengl::components {
 
-    template<typename TOwnerHandle>
+
     struct OpenGLMeshComponent {
 
 
-        using HandleType = TOwnerHandle;
 
         types::OpenGLMeshData data;
 
