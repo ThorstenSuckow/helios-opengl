@@ -49,13 +49,13 @@ export namespace helios::opengl {
             HELIOS_LOG_SCOPE
         );
 
-        template<typename THandle, typename TEntity>
+        template<typename TEntity>
         types::OpenGLClearColorData clearColorData(TEntity& entity) noexcept {
 
             types::OpenGLClearColorData clearColorData{};
 
-            auto* colorComp = entity->template get<engine::core::components::ColorComponent<THandle>>();
-            auto* clearComp = entity->template get<engine::rendering::common::components::ClearComponent<THandle>>();
+            auto* colorComp = entity->template get<engine::core::components::ColorComponent>();
+            auto* clearComp = entity->template get<engine::rendering::common::components::ClearComponent>();
 
             if (colorComp) {
                 const auto clearColor = colorComp->value();
@@ -73,7 +73,7 @@ export namespace helios::opengl {
         template<typename TEntity>
         [[nodiscard]] std::optional<types::OpenGLViewProjectionData> viewProjection(const TEntity& viewportEntity, ecs::entity::EntityWorld& ecsWorld) const noexcept {
             auto* cbc = viewportEntity.template get<
-                engine::scene::components::CameraBindingComponent<typename TEntity::HandleType, TRenderHandles>
+                engine::scene::components::CameraBindingComponent<TRenderHandles>
             >();
             if (!cbc) {
                 logger_.error("Expected CameraBindingComponent on ViewportEntity, but couldn't find any.");
@@ -84,14 +84,14 @@ export namespace helios::opengl {
                 logger_.error("Expected CameraEntity, but couldn't find any.");
                 return std::nullopt;
             }
-            using CameraHandle = std::remove_cvref_t<decltype(cbc->targetHandle())>;
-            auto* vm = camera->template get<engine::scene::components::ViewMatrixComponent<CameraHandle>>();
+
+            auto* vm = camera->template get<engine::scene::components::ViewMatrixComponent>();
             if (!vm) {
                 logger_.error("Expected ViewMatrixComponent, but couldn't find any.");
                 return std::nullopt;
             }
 
-            auto* pm = camera->template get<engine::scene::components::ProjectionMatrixComponent<CameraHandle>>();
+            auto* pm = camera->template get<engine::scene::components::ProjectionMatrixComponent>();
             if (!pm) {
                 logger_.error("Expected ProjectionMatrixComponent, but couldn't find any.");
                 return std::nullopt;
@@ -117,12 +117,12 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto renderTargetSize = renderTargetEntity->template get<engine::spatial::components::Size2DComponent<RenderTargetHandle>>()->value();
-            const auto renderTargetId = renderTargetEntity->template get<components::OpenGLRenderTargetIdComponent<RenderTargetHandle>>()->value();
+            auto renderTargetSize = renderTargetEntity->template get<engine::spatial::components::Size2DComponent>()->value();
+            const auto renderTargetId = renderTargetEntity->template get<components::OpenGLRenderTargetIdComponent>()->value();
 
             renderTargetData.renderTargetId = renderTargetId;
             renderTargetData.renderTargetSize = {renderTargetSize[0], renderTargetSize[1]};
-            renderTargetData.clearColorData = clearColorData<RenderTargetHandle>(renderTargetEntity);
+            renderTargetData.clearColorData = clearColorData(renderTargetEntity);
 
             return renderTargetData;
         }
@@ -142,10 +142,10 @@ export namespace helios::opengl {
 
             viewportData.viewProjectionData = viewProjection(*viewport, ecsWorld);
 
-            auto bounds = viewport->template get<engine::spatial::components::RectComponent<ViewportHandle>>()->value();
+            auto bounds = viewport->template get<engine::spatial::components::RectComponent<>>()->value();
             viewportData.viewportBounds  = {bounds[0], bounds[1], bounds[2], bounds[3]};
 
-            viewportData.clearColorData = clearColorData<ViewportHandle>(viewport);
+            viewportData.clearColorData = clearColorData(viewport);
 
             return viewportData;
         }
@@ -176,13 +176,13 @@ export namespace helios::opengl {
             using DrawScope =engine::rendering::shader::types::UniformScope::Draw;
 
             auto* ulcUniform = shaderEntity->template get<
-                components::OpenGLUniformWriteOperationsComponent<ShaderHandle, PassScope>>();
+                components::OpenGLUniformWriteOperationsComponent<PassScope>>();
 
             auto* ulcMaterial = shaderEntity->template get<
-               components::OpenGLUniformWriteOperationsComponent<ShaderHandle, MaterialScope>>();
+               components::OpenGLUniformWriteOperationsComponent<MaterialScope>>();
 
             auto* ulcDraw = shaderEntity->template get<
-               components::OpenGLUniformWriteOperationsComponent<ShaderHandle, DrawScope>>();
+               components::OpenGLUniformWriteOperationsComponent<DrawScope>>();
 
              if (!ulcUniform || !ulcMaterial || !ulcDraw) {
                  logger_.warn("Pass/material/draw scope missing.");
@@ -238,7 +238,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            if (auto* colorComponent = materialEntity->template get<engine::core::components::ColorComponent<MaterialHandle>>()) {
+            if (auto* colorComponent = materialEntity->template get<engine::core::components::ColorComponent>()) {
                 materialData.baseColor = colorComponent->value();
             }
 
@@ -258,7 +258,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto* openglMesh = meshEntity->template get<components::OpenGLMeshComponent<MeshHandle>>();
+            auto* openglMesh = meshEntity->template get<components::OpenGLMeshComponent>();
             if (!openglMesh) {
                 logger_.error("OpenGLMesh expected, but not found");
                 assert(false && "OpenGLMesh not found");

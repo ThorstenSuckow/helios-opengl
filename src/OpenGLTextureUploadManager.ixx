@@ -71,7 +71,7 @@ export namespace helios::opengl {
             logger_.info("Uploading texture data for MeshEntity {0}...", texture.handle().entityId());
 
 
-            auto* textureSourceCmp = texture.template get<texture::components::TextureSourceComponent<THandle>>();
+            auto* textureSourceCmp = texture.template get<texture::components::TextureSourceComponent>();
             if (!textureSourceCmp) {
                 logger_.error("Texture upload not requested by this entity");
                 assert(false && "Texture upload not requested by this entity");
@@ -79,7 +79,7 @@ export namespace helios::opengl {
             }
 
 
-            if (texture.template get<OpenGLTextureComponent<THandle>>()) {
+            if (texture.template get<OpenGLTextureComponent>()) {
                 logger_.error("Mesh already has a MeshComponent");
                 assert(false && "Mesh already has a MeshComponent");
                 return false;
@@ -158,7 +158,7 @@ export namespace helios::opengl {
                     logger_.error("Could not upload texture");
                     assert(false && "Could not upload texture");
                 } else {
-                    textureEntity->template remove<texture::components::TextureSourceComponent<THandle>>();
+                    textureEntity->template remove<texture::components::TextureSourceComponent>();
                 }
             }
 

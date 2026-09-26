@@ -83,7 +83,7 @@ export namespace helios::opengl {
          * @param layoutComponent Attribute layout component to translate to OpenGL calls.
          */
         template<typename TVertexInputRate>
-        void buildVertexAttributeLayout(const VertexAttributeLayoutComponent<THandle, TVertexInputRate>* layoutComponent) noexcept {
+        void buildVertexAttributeLayout(const VertexAttributeLayoutComponent<TVertexInputRate>* layoutComponent) noexcept {
 
             const auto& active = layoutComponent->active();
             const auto& layouts = layoutComponent->layouts();
@@ -154,30 +154,30 @@ export namespace helios::opengl {
 
             logger_.info("Uploading mesh data for MeshEntity {0}...", mesh.handle().entityId());
 
-            if (!mesh.template get<MeshUploadRequestComponent<Handle>>()) {
+            if (!mesh.template get<MeshUploadRequestComponent>()) {
                 logger_.error("MeshUpload not requested by this entity");
                 assert(false && "MeshUpload not requested by this entity");
                 return false;
             }
 
 
-            if (mesh.template get<OpenGLMeshComponent<Handle>>()) {
+            if (mesh.template get<OpenGLMeshComponent>()) {
                 logger_.error("Mesh already has a MeshComponent");
                 assert(false && "Mesh already has a MeshComponent");
                 return false;
             }
 
-            auto* meshDataComponent = mesh.template get<MeshDataComponent<Handle>>();
+            auto* meshDataComponent = mesh.template get<MeshDataComponent>();
             auto& meshData = meshDataComponent->meshData;
 
-            auto& openglMesh = mesh.template add<OpenGLMeshComponent<Handle>>();
+            auto& openglMesh = mesh.template add<OpenGLMeshComponent>();
 
             openglMesh.data.indexCount    = meshData.indices.size();
             openglMesh.data.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
-            auto* vertexAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<Handle, PerVertex>>();
+            auto* vertexAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<PerVertex>>();
             assert(vertexAttributeLayoutComponent && "Expected a VertexAttributeLayoutComponent for PerVertex attributes");
-            auto* instancedAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<Handle, PerInstance>>();
+            auto* instancedAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<PerInstance>>();
 
             glGenVertexArrays(1, &openglMesh.data.vao);
             glGenBuffers(1, &openglMesh.data.vbo);
@@ -209,15 +209,15 @@ export namespace helios::opengl {
 
             // per instance buffer
             buildVertexAttributeLayout<PerVertex>(vertexAttributeLayoutComponent);
-            mesh.template remove<VertexAttributeLayoutComponent<Handle, PerVertex>>();
+            mesh.template remove<VertexAttributeLayoutComponent<PerVertex>>();
 
             if (instancedAttributeLayoutComponent) {
                 glBindBuffer(GL_ARRAY_BUFFER, openglMesh.data.instanceVbo);
                 buildVertexAttributeLayout<PerInstance>(instancedAttributeLayoutComponent);
-                mesh.template remove<VertexAttributeLayoutComponent<Handle, PerInstance>>();
+                mesh.template remove<VertexAttributeLayoutComponent<PerInstance>>();
             }
 
-            mesh.template remove<MeshDataComponent<Handle>>();
+            mesh.template remove<MeshDataComponent>();
 
 
             glBindVertexArray(0);
@@ -253,7 +253,7 @@ export namespace helios::opengl {
                     return false;
                 }
 
-                meshEntity->template remove<MeshUploadRequestComponent<THandle>>();
+                meshEntity->template remove<MeshUploadRequestComponent>();
 
             }
 

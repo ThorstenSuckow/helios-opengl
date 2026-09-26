@@ -125,7 +125,7 @@ export namespace helios::opengl {
                 return false;
             }
 
-            auto* shaderSourceComponent = shader.template get<ShaderSourceComponent<Handle>>();
+            auto* shaderSourceComponent = shader.template get<ShaderSourceComponent>();
 
 
             const bool loaded = load(
@@ -225,7 +225,7 @@ export namespace helios::opengl {
                     return false;
                 }
 
-                shaderEntity->template remove<ShaderSourceComponent<THandle>>();
+                shaderEntity->template remove<ShaderSourceComponent>();
                 std::ignore = uniformCacheStrategy.template cacheUniforms<UniformScope::Pass>(shaderEntity->handle(), entityManager);
                 std::ignore = uniformCacheStrategy.template cacheUniforms<UniformScope::Material>(shaderEntity->handle(), entityManager);
                 std::ignore = uniformCacheStrategy.template cacheUniforms<UniformScope::Draw>(shaderEntity->handle(), entityManager);

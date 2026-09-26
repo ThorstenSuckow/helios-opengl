@@ -68,7 +68,7 @@ export namespace helios::opengl {
                 return false;
             }
 
-            auto* umc = shaderEntity->template get<UniformMappingsComponent<THandle, TUniformScope>>();
+            auto* umc = shaderEntity->template get<UniformMappingsComponent<TUniformScope>>();
             if (!umc) {
                 logger_.info("No UniformMappingsComponent available.");
                 return false;
@@ -82,7 +82,7 @@ export namespace helios::opengl {
 
             GLuint programId = osc->programId;
 
-            auto& ulc = shaderEntity->template getOrAdd<OpenGLUniformWriteOperationsComponent<THandle, TUniformScope>>();
+            auto& ulc = shaderEntity->template getOrAdd<OpenGLUniformWriteOperationsComponent<TUniformScope>>();
 
             for (std::size_t i = 0; i < umc->mappings.size(); ++i ) {
                 if (!umc->mappings[i].empty()) {
@@ -97,7 +97,7 @@ export namespace helios::opengl {
                 }
             }
 
-            shaderEntity->template remove<UniformMappingsComponent<THandle, TUniformScope>>();
+            shaderEntity->template remove<UniformMappingsComponent<TUniformScope>>();
 
             return true;
         }
