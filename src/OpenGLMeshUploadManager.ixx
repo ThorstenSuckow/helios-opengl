@@ -172,7 +172,7 @@ export namespace helios::opengl {
 
             auto& openglMesh = mesh.template add<OpenGLMeshComponent>();
 
-            openglMesh.data.indexCount    = meshData.indices.size();
+            openglMesh.data.indexCount    = static_cast<uint32_t>(meshData.indices.size());
             openglMesh.data.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
             auto* vertexAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<PerVertex>>();
