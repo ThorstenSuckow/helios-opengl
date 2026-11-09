@@ -142,7 +142,7 @@ export namespace helios::opengl {
 
             viewportData.viewProjectionData = viewProjection(*viewport, ecsWorld);
 
-            auto bounds = viewport->template get<engine::spatial::components::RectComponent<>>()->value();
+            auto bounds = viewport->template get<engine::spatial::components::RectComponent>()->value();
             viewportData.viewportBounds  = {bounds[0], bounds[1], bounds[2], bounds[3]};
 
             viewportData.clearColorData = clearColorData(viewport);
@@ -213,7 +213,7 @@ export namespace helios::opengl {
                 return std::nullopt;
             }
 
-            auto* openglTexture = textureEntity->template get<components::OpenGLTextureComponent<TextureHandle>>();
+            auto* openglTexture = textureEntity->template get<components::OpenGLTextureComponent>();
             if (!openglTexture) {
                 logger_.error("OpenGLTexture expected, but not found");
                 assert(false && "OpenGLTexture not found");

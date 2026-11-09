@@ -12,7 +12,6 @@ export namespace helios::opengl::components {
      *
      * @tparam THandle Texture handle type.
      */
-    template<typename TOwnerHandle>
     struct OpenGLTextureComponent  {
 
         /** @brief Linked OpenGL texture id. */

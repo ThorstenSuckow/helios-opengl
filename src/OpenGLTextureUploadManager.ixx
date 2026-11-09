@@ -61,6 +61,7 @@ export namespace helios::opengl {
          * @brief Uploads one texture to GPU buffers.
          *
          * @param texture Texture entity containing upload request and texture data.
+         * @param imageReader
          *
          * @return `true` if upload succeeded, otherwise `false`.
          */
@@ -121,7 +122,7 @@ export namespace helios::opengl {
             );
             glGenerateMipmap(GL_TEXTURE_2D);
 
-            texture.template add<OpenGLTextureComponent<THandle>>(textureId);
+            texture.template add<OpenGLTextureComponent>(textureId);
 
             return true;
         }
