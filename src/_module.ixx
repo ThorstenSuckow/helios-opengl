@@ -6,10 +6,13 @@
 export module helios.opengl;
 
 export import helios.opengl.components;
+export import helios.opengl.commands;
+export import helios.opengl.systems;
 export import helios.opengl.types;
 
 export import helios.opengl.OpenGLBackend;
 export import helios.opengl.OpenGLRenderDataResolver;
+export import helios.opengl.OpenGLRenderTargetManager;
 export import helios.opengl.OpenGLShaderCompileManager;
 export import helios.opengl.OpenGLMeshUploadManager;
 export import helios.opengl.OpenGLTextureUploadManager;
