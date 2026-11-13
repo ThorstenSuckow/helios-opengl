@@ -33,6 +33,8 @@ import helios.engine.scene.components;
 import helios.engine.scene.types;
 
 import helios.opengl.types;
+import helios.opengl.OpenGLAttributeFormat;
+import helios.opengl.OpenGLEnumMapper;
 
 using namespace helios::engine::rendering;
 using namespace helios::engine::rendering::shader;
@@ -110,6 +112,64 @@ export namespace helios::opengl {
 
     public:
 
+        /**
+         * @brief Configures Vertex Attribute Layouts for a given mesh and shader combination.
+         *
+         * @param meshData
+         * @param vertexAttributeMappings
+         * @param vertexAttributeLayouts
+         */
+        void configureVertexAttributes(
+            const types::OpenGLMeshData& meshData,
+            const shader::types::VertexAttributeMappings& vertexAttributeMappings,
+            const mesh::types::VertexAttributeLayouts& vertexAttributeLayouts
+        ) noexcept {
+
+            const auto& active = vertexAttributeLayouts.active();
+            const auto& layouts = vertexAttributeLayouts.items();
+
+            const auto& mappings = vertexAttributeMappings.mappings;
+
+            glBindVertexArray(meshData.vao);
+
+            for (std::size_t idx = 0; idx < active.size(); idx++) {
+
+                if (!active.test(idx)) {
+                    continue;
+                }
+
+                const auto& layout = layouts[idx];
+
+                const auto format = helios::opengl::fromAttributeType(layout.attribute.type);
+
+                const auto inputRate = layout.inputRate;
+
+                if (inputRate == VertexInputRate::PerInstance) {
+                    glBindBuffer(GL_ARRAY_BUFFER, meshData.instanceVbo);
+                } else {
+                    glBindBuffer(GL_ARRAY_BUFFER, meshData.vbo);
+                }
+
+                for (std::uint32_t i = 0; i < format.locationCount; i++) {
+                    const auto location = mappings[idx].location + i;
+
+                    glEnableVertexAttribArray(location);
+                    glVertexAttribPointer(
+                        location,
+                        format.componentsPerLocation,
+                        helios::opengl::OpenGLEnumMapper::toOpenGLBaseType(layout.attribute.type),
+                        GL_FALSE,
+                        static_cast<GLsizei>(layout.stride),
+                        reinterpret_cast<void*>(layout.offset + (i * format.locationStrideBytes))
+                    );
+                    glVertexAttribDivisor(location, layout.divisor);
+                }
+
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+            }
+
+            glBindVertexArray(0);
+        }
 
         /**
          * @brief Begins processing for one render-target batch.

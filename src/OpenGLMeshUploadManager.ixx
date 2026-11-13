@@ -67,80 +67,27 @@ export namespace helios::opengl {
 
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
 
-        /**
-         * @brief Derived OpenGL attribute layout information for one engine attribute type.
-         */
-        struct AttributeFormat {
-            std::uint32_t locationCount;
-            std::uint32_t componentsPerLocation;
-            std::uint32_t locationStrideBytes;
-        };
 
-        /**
-         * @brief Configures OpenGL vertex attribute pointers from one layout component.
-         *
-         * @tparam TVertexInputRate Input-rate tag (`PerVertex` or `PerInstance`).
-         * @param layoutComponent Attribute layout component to translate to OpenGL calls.
-         */
-        template<typename TVertexInputRate>
-        void buildVertexAttributeLayout(const VertexAttributeLayoutComponent<TVertexInputRate>* layoutComponent) noexcept {
+        [[nodiscard]] bool usesInstancing(MeshEntity mesh) {
+            auto* vertexAttributeLayoutsComponent = mesh.template get<VertexAttributeLayoutsComponent>();
 
-            const auto& active = layoutComponent->active();
-            const auto& layouts = layoutComponent->layouts();
+            if (!vertexAttributeLayoutsComponent) {
+                return false;
+            }
 
-            for (std::size_t idx = 0; idx < active.size(); idx++) {
+            auto& layouts = vertexAttributeLayoutsComponent->layouts;
 
-                if (!active.test(idx)) {
+            for (auto i = 0; i < layouts.active().size(); i++) {
+                if (!layouts.active().test(i)) {
                     continue;
                 }
-
-                const auto& layout = layouts[idx];
-
-                const auto format = fromAttributeType(layout.attribute.type);
-
-                for (std::uint32_t i = 0; i < format.locationCount; i++) {
-                    const auto location = layout.location + i;
-
-                    glEnableVertexAttribArray(location);
-                    glVertexAttribPointer(
-                        location,
-                        format.componentsPerLocation,
-                        OpenGLEnumMapper::toOpenGLBaseType(layout.attribute.type),
-                        GL_FALSE,
-                        static_cast<GLsizei>(layout.stride),
-                        reinterpret_cast<void*>(layout.offset + (i * format.locationStrideBytes))
-                    );
-                    glVertexAttribDivisor(location, layout.divisor);
+                if (layouts.items()[i].inputRate == VertexInputRate::PerInstance) {
+                    return true;
                 }
             }
-
+            return false;
         }
 
-
-        /**
-         * @brief Maps engine attribute type to OpenGL attribute format details.
-         *
-         * @param attributeType Engine-side vertex attribute type.
-         * @return Expanded format used to configure one or multiple attribute locations.
-         */
-        [[nodiscard]] AttributeFormat fromAttributeType(VertexAttributeType attributeType) const noexcept {
-
-            switch (attributeType) {
-                case VertexAttributeType::Float:
-                    return AttributeFormat{1, 1, 0};
-                case VertexAttributeType::Vec2f:
-                    return AttributeFormat{1, 2, 0};
-                case VertexAttributeType::Vec3f:
-                    return AttributeFormat{1, 3, 0};
-                case VertexAttributeType::Vec4f:
-                    return AttributeFormat{1, 4, 0};
-                case VertexAttributeType::Mat4f:
-                    return AttributeFormat{4, 4, sizeof(float) * 4};
-                default:
-                    std::unreachable();
-            }
-
-        }
 
         /**
          * @brief Uploads one mesh to GPU buffers and configures vertex attributes.
@@ -175,15 +122,11 @@ export namespace helios::opengl {
             openglMesh.data.indexCount    = static_cast<uint32_t>(meshData.indices.size());
             openglMesh.data.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
-            auto* vertexAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<PerVertex>>();
-            assert(vertexAttributeLayoutComponent && "Expected a VertexAttributeLayoutComponent for PerVertex attributes");
-            auto* instancedAttributeLayoutComponent = mesh.template get<VertexAttributeLayoutComponent<PerInstance>>();
-
             glGenVertexArrays(1, &openglMesh.data.vao);
             glGenBuffers(1, &openglMesh.data.vbo);
             glGenBuffers(1, &openglMesh.data.ebo);
 
-            if (instancedAttributeLayoutComponent) {
+            if (usesInstancing(mesh)) {
                 glGenBuffers(1, &openglMesh.data.instanceVbo);
             }
 
@@ -206,16 +149,6 @@ export namespace helios::opengl {
                 &(meshData.indices)[0],
                 GL_STATIC_DRAW
             );
-
-            // per instance buffer
-            buildVertexAttributeLayout<PerVertex>(vertexAttributeLayoutComponent);
-            mesh.template remove<VertexAttributeLayoutComponent<PerVertex>>();
-
-            if (instancedAttributeLayoutComponent) {
-                glBindBuffer(GL_ARRAY_BUFFER, openglMesh.data.instanceVbo);
-                buildVertexAttributeLayout<PerInstance>(instancedAttributeLayoutComponent);
-                mesh.template remove<VertexAttributeLayoutComponent<PerInstance>>();
-            }
 
             mesh.template remove<MeshDataComponent>();
 
