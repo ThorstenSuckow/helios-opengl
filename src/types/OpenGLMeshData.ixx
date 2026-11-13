@@ -32,7 +32,7 @@ export namespace helios::opengl::types {
         std::uint32_t ebo;
 
         /**
-         * @brief Instance Buffer Object handle, if any. Will be 0 if no instancing is cosnidered.
+         * @brief Instance Buffer Object handle, if any. Will be 0 if no instancing is considered.
          */
         std::uint32_t instanceVbo;
 
