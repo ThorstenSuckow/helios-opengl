@@ -5,7 +5,7 @@ module;
 
 export module helios.opengl.OpenGLAttributeFormat;
 
-import helios.engine.rendering.mesh.types.VertexAttributeType;
+import helios.engine.rendering.vertexInput.types;
 
 export namespace helios::opengl {
 
@@ -27,18 +27,18 @@ export namespace helios::opengl {
      * @return Expanded format used to configure one or multiple attribute locations.
      */
     [[nodiscard]] OpenGLAttributeFormat fromAttributeType(
-        helios::engine::rendering::mesh::types::VertexAttributeType attributeType) noexcept {
+        helios::engine::rendering::vertexInput::types::VertexAttributeType attributeType) noexcept {
 
         switch (attributeType) {
-            case helios::engine::rendering::mesh::types::VertexAttributeType::Float:
+            case helios::engine::rendering::vertexInput::types::VertexAttributeType::Float:
                 return OpenGLAttributeFormat{1, 1, 0};
-            case helios::engine::rendering::mesh::types::VertexAttributeType::Vec2f:
+            case helios::engine::rendering::vertexInput::types::VertexAttributeType::Vec2f:
                 return OpenGLAttributeFormat{1, 2, 0};
-            case helios::engine::rendering::mesh::types::VertexAttributeType::Vec3f:
+            case helios::engine::rendering::vertexInput::types::VertexAttributeType::Vec3f:
                 return OpenGLAttributeFormat{1, 3, 0};
-            case helios::engine::rendering::mesh::types::VertexAttributeType::Vec4f:
+            case helios::engine::rendering::vertexInput::types::VertexAttributeType::Vec4f:
                 return OpenGLAttributeFormat{1, 4, 0};
-            case helios::engine::rendering::mesh::types::VertexAttributeType::Mat4f:
+            case helios::engine::rendering::vertexInput::types::VertexAttributeType::Mat4f:
                 return OpenGLAttributeFormat{4, 4, sizeof(float) * 4};
             default:
                 std::unreachable();

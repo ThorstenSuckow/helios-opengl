@@ -5,4 +5,3 @@
 export module helios.opengl.systems;
 
 export import helios.opengl.systems.OpenGLAssignRenderTargetIdSystem;
-

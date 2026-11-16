@@ -24,6 +24,7 @@ import helios.engine.rendering.common.types.Vertex;
 import helios.engine.rendering.mesh.commands;
 import helios.engine.rendering.mesh.components;
 import helios.engine.rendering.mesh.types;
+import helios.engine.rendering.vertexInput;
 
 import helios.ecs;
 
@@ -68,27 +69,6 @@ export namespace helios::opengl {
         inline static const Logger& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
 
 
-        [[nodiscard]] bool usesInstancing(MeshEntity mesh) {
-            auto* vertexAttributeLayoutsComponent = mesh.template get<VertexAttributeLayoutsComponent>();
-
-            if (!vertexAttributeLayoutsComponent) {
-                return false;
-            }
-
-            auto& layouts = vertexAttributeLayoutsComponent->layouts;
-
-            for (auto i = 0; i < layouts.active().size(); i++) {
-                if (!layouts.active().test(i)) {
-                    continue;
-                }
-                if (layouts.items()[i].inputRate == VertexInputRate::PerInstance) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-
         /**
          * @brief Uploads one mesh to GPU buffers and configures vertex attributes.
          *
@@ -122,15 +102,15 @@ export namespace helios::opengl {
             openglMesh.data.indexCount    = static_cast<uint32_t>(meshData.indices.size());
             openglMesh.data.primitiveType = OpenGLEnumMapper::toOpenGL(meshData.primitiveType);
 
-            glGenVertexArrays(1, &openglMesh.data.vao);
+           // glGenVertexArrays(1, &openglMesh.data.vao);
             glGenBuffers(1, &openglMesh.data.vbo);
             glGenBuffers(1, &openglMesh.data.ebo);
 
-            if (usesInstancing(mesh)) {
+            /*if (usesInstancing(mesh)) {
                 glGenBuffers(1, &openglMesh.data.instanceVbo);
-            }
+            }*/
 
-            glBindVertexArray(openglMesh.data.vao);
+         //   glBindVertexArray(openglMesh.data.vao);
 
             // vertex buffer
             glBindBuffer(GL_ARRAY_BUFFER, openglMesh.data.vbo);

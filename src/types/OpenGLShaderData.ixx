@@ -17,6 +17,8 @@ export namespace helios::opengl::types {
 
     struct OpenGLShaderData {
 
+        std::uint64_t uid;
+
         std::uint32_t programId = 0;
 
         std::vector<OpenGLUniformWriteOperation> passWriteOperations{};

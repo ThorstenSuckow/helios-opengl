@@ -170,6 +170,7 @@ export namespace helios::opengl {
             }
 
             shaderData.programId = openglShader->programId;
+            shaderData.uid = shaderHandle.raw();
 
             using PassScope =engine::rendering::shader::types::UniformScope::Pass;
             using MaterialScope =engine::rendering::shader::types::UniformScope::Material;
@@ -266,6 +267,7 @@ export namespace helios::opengl {
             }
 
             meshData = openglMesh->data;
+            meshData.uid = meshHandle.raw();;
 
             return meshData;
         }

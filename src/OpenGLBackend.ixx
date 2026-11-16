@@ -9,7 +9,7 @@ module;
 #include <memory>
 #include <cassert>
 #include <utility>
-#include <type_traits>
+#include <unordered_map>
 #include <span>
 #include "helios-opengl-config.h"
 #include <optional>
@@ -28,6 +28,9 @@ import helios.opengl.types;
 import helios.engine.rendering.mesh;
 import helios.engine.rendering.shader;
 import helios.engine.rendering.texture;
+
+import helios.engine.rendering.vertexInput;
+
 
 import helios.engine.scene.components;
 import helios.engine.scene.types;
@@ -109,6 +112,15 @@ export namespace helios::opengl {
             }
         }
 
+        struct VertexInput {
+            GLuint vao;
+            GLuint instanceVbo = 0;
+        };
+
+        std::unordered_map<
+            std::uint64_t,
+            std::unordered_map<std::uint64_t, VertexInput>
+        > vertexInputs_;
 
     public:
 
@@ -117,16 +129,20 @@ export namespace helios::opengl {
          *
          * @param meshData
          * @param vertexAttributeMappings
-         * @param vertexAttributeLayouts
+         * @param vertexBufferLayout
          */
-        void configureVertexAttributes(
-            const types::OpenGLMeshData& meshData,
-            const shader::types::VertexAttributeMappings& vertexAttributeMappings,
-            const mesh::types::VertexAttributeLayouts& vertexAttributeLayouts
+        void setupVertexInput(
+            const OpenGLMeshData& meshData,
+            const VertexAttributeMappings& vertexAttributeMappings,
+            const engine::rendering::vertexInput::types::VertexBufferLayout& vertexBufferLayout
         ) noexcept {
+/*
+            const auto& active = vertexBufferLayout.active();
+            const auto& layouts = vertexBufferLayout.items();
 
-            const auto& active = vertexAttributeLayouts.active();
-            const auto& layouts = vertexAttributeLayouts.items();
+
+            const auto inputRate = vertexBufferLayout.inputRate();
+            const auto stride = vertexBufferLayout.stride();
 
             const auto& mappings = vertexAttributeMappings.mappings;
 
@@ -142,9 +158,7 @@ export namespace helios::opengl {
 
                 const auto format = helios::opengl::fromAttributeType(layout.attribute.type);
 
-                const auto inputRate = layout.inputRate;
-
-                if (inputRate == VertexInputRate::PerInstance) {
+                if (inputRate == engine::rendering::vertexInput::types::VertexInputRate::PerInstance) {
                     glBindBuffer(GL_ARRAY_BUFFER, meshData.instanceVbo);
                 } else {
                     glBindBuffer(GL_ARRAY_BUFFER, meshData.vbo);
@@ -159,16 +173,19 @@ export namespace helios::opengl {
                         format.componentsPerLocation,
                         helios::opengl::OpenGLEnumMapper::toOpenGLBaseType(layout.attribute.type),
                         GL_FALSE,
-                        static_cast<GLsizei>(layout.stride),
+                        static_cast<GLsizei>(stride),
                         reinterpret_cast<void*>(layout.offset + (i * format.locationStrideBytes))
                     );
-                    glVertexAttribDivisor(location, layout.divisor);
+                    glVertexAttribDivisor(
+                        location,
+                        inputRate == vertexInput::types::VertexInputRate::PerInstance ? 1 : 0
+                    );
                 }
 
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
 
-            glBindVertexArray(0);
+            glBindVertexArray(0);*/
         }
 
         /**
@@ -253,7 +270,6 @@ export namespace helios::opengl {
         /**
          * @brief Ends processing for one viewport batch.
          *
-         * @param viewportHandle Viewport handle for this batch.
          */
         void endViewportBatch() noexcept {
             glDisable(GL_SCISSOR_TEST);
@@ -324,7 +340,7 @@ export namespace helios::opengl {
          */
         void beginMeshBatch(const types::OpenGLMeshData& meshData) noexcept {
             currentMeshData_ = meshData;
-            glBindVertexArray(meshData.vao);
+           // glBindVertexArray(meshData.vao);
         }
 
         /**
@@ -342,7 +358,6 @@ export namespace helios::opengl {
          * @details Iterates `sceneMemberRenderContexts`, updates draw-scope
          * uniforms per context, and issues one indexed draw call per member.
          *
-         * @tparam THandle Scene member handle type contained in render contexts.
          * @param sceneMemberRenderContexts Non-instanced draw contexts.
          */
         void renderBatch(const std::span<const DrawData> sceneMemberRenderContexts) noexcept {
@@ -369,7 +384,6 @@ export namespace helios::opengl {
          * @details Uploads `instanceData` to the active instance VBO and submits
          * one `glDrawElementsInstanced` call. Returns early when the input span is empty.
          *
-         * @tparam THandle Scene member handle type used by `InstanceData`.
          * @param instanceData Per-instance payload for instanced rendering.
          */
         void renderBatch(const std::span<const InstanceData> instanceData) const noexcept {

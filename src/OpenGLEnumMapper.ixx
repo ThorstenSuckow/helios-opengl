@@ -10,7 +10,7 @@ module;
 export module helios.opengl.OpenGLEnumMapper;
 
 import helios.engine.rendering.mesh.types.PrimitiveType;
-import helios.engine.rendering.mesh.types.VertexAttributeType;
+import helios.engine.rendering.vertexInput.types;
 
 using namespace helios::engine::rendering::mesh::types;
 export namespace helios::opengl::OpenGLEnumMapper {
@@ -48,13 +48,13 @@ export namespace helios::opengl::OpenGLEnumMapper {
      * @param attributeType Engine attribute type.
      * @return Matching OpenGL attribute type enum.
      */
-    [[nodiscard]] GLenum toOpenGLBaseType(const VertexAttributeType attributeType) noexcept {
+    [[nodiscard]] GLenum toOpenGLBaseType(const engine::rendering::vertexInput::types::VertexAttributeType attributeType) noexcept {
         switch (attributeType) {
-            case VertexAttributeType::Float:
-            case VertexAttributeType::Vec2f:
-            case VertexAttributeType::Vec3f:
-            case VertexAttributeType::Vec4f:
-            case VertexAttributeType::Mat4f:
+            case engine::rendering::vertexInput::types::VertexAttributeType::Float:
+            case engine::rendering::vertexInput::types::VertexAttributeType::Vec2f:
+            case engine::rendering::vertexInput::types::VertexAttributeType::Vec3f:
+            case engine::rendering::vertexInput::types::VertexAttributeType::Vec4f:
+            case engine::rendering::vertexInput::types::VertexAttributeType::Mat4f:
                 return GL_FLOAT;
             default:
                 std::unreachable();

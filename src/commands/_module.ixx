@@ -5,4 +5,3 @@
 export module helios.opengl.commands;
 
 export import helios.opengl.commands.OpenGLAssignRenderTargetIdCommand;
-

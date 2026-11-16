@@ -20,7 +20,16 @@ using namespace helios::opengl::commands;
 
 export namespace helios::opengl::systems {
 
-
+    /**
+     * @brief Queues `OpenGLAssignRenderTargetIdCommand` for the render target of every window
+     * that still has a pending `WindowCreateRequestComponent`.
+     *
+     * @details The default framebuffer of a window is the render target of that window.
+     * Assigning the id is done by `OpenGLRenderTargetManager`.
+     *
+     * @tparam TWindowHandle Window-domain entity handle type.
+     * @tparam TRenderHandles Render handle collection.
+     */
     template<typename TWindowHandle, typename TRenderHandles>
     class OpenGLAssignRenderTargetIdSystem {
 
@@ -60,4 +69,3 @@ export namespace helios::opengl::systems {
     };
 
 }
-

@@ -16,10 +16,7 @@ export namespace helios::opengl::types {
 
     struct OpenGLMeshData {
 
-        /**
-         * @brief Vertex Array Object handle.
-         */
-        std::uint32_t vao;
+        std::uint64_t uid;
 
         /**
          * @brief Vertex Buffer Object handle.
@@ -45,7 +42,7 @@ export namespace helios::opengl::types {
          * @brief Primitive topology used for rendering this mesh.
          */
         GLenum primitiveType;
-        
+
     };
 
 
